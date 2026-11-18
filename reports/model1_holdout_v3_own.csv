@@ -1,0 +1,5 @@
+,MAE (Bcf),RMSE (Bcf),bias (Bcf),beats 5-yr avg (%),surprise sign right (%),weeks,80% range covered (%),winter MAE,summer MAE
+5-year average,31.3,45.4,0.0,0.0,0.8,253.0,77.5,53.6,16.6
+Last week's change,35.0,53.4,0.4,46.2,62.5,253.0,77.5,60.6,18.3
+Ridge (alpha=0.1),13.8,18.1,1.4,70.8,81.8,253.0,84.6,15.7,12.5
+"Gradient boosting (0.03, 7)",14.6,19.7,0.7,70.4,79.8,253.0,85.8,18.5,12.1

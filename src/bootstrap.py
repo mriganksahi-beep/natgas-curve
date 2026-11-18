@@ -38,7 +38,7 @@ def newey_west_t(d, lags=8):
     return np.sqrt(var / n)  # standard error of the mean, robust to autocorrelation
 
 
-def main(tag="v2_own"):
+def main(tag="v3_own"):
     p = pd.read_csv(ROOT / f"data/processed/model1_predictions_{tag}.csv", index_col=0, parse_dates=True)
     h = p[p.index >= "2022-01-01"].dropna()
     ridge = [c for c in h if c.startswith("Ridge")][0]

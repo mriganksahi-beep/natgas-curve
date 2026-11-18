@@ -18,6 +18,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 ROOT = Path(__file__).resolve().parents[1]
+ALIGN = "calendar"  # "weeks52" reproduces v1/v2
 VAL_START, HOLDOUT_START = pd.Timestamp("2018-01-01"), pd.Timestamp("2022-01-01")
 
 
@@ -29,7 +30,9 @@ def same_week_prior_years(s: pd.Series, years=5) -> pd.Series:
     for t in idx:
         vals = []
         for k in range(1, years + 1):
-            target = t - pd.Timedelta(weeks=52 * k)
+            # same calendar date k years earlier (v3). v1/v2 used t - 52k weeks, which
+            # drifts about a day per year, so the "same week" 5 years back was up to 6 days off.
+            target = t - pd.DateOffset(years=k) if ALIGN == "calendar" else t - pd.Timedelta(weeks=52 * k)
             pos = idx.searchsorted(target)
             cands = [p for p in (pos - 1, pos) if 0 <= p < len(idx)]
             best = min(cands, key=lambda p: abs(idx[p] - target)) if cands else None

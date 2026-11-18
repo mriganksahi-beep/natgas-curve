@@ -96,7 +96,7 @@ def forecast(daily=None, now=None):
     point = float(model.predict(df.loc[[target], FEATURES_V2])[0])
 
     # 80% range from the walk-forward errors of the same model (2018 onward)
-    wf = pd.read_csv(ROOT / "data/processed/model1_predictions_v2_own.csv", index_col=0, parse_dates=True)
+    wf = pd.read_csv(ROOT / "data/processed/model1_predictions_v3_own.csv", index_col=0, parse_dates=True)
     col = [c for c in wf if c.startswith("Ridge")][0]
     err = (wf["actual"] - wf[col]).dropna()
     lo, hi = point + err.quantile(0.1), point + err.quantile(0.9)

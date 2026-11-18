@@ -64,6 +64,7 @@ A null result on Model 3 gets reported the same way, as a finding.
 ## Change log
 | Date | Change | Why |
 | --- | --- | --- |
+| 2026-11-18 | Model 1 v3: the 5-year average now matches the same calendar date in each prior year | v1/v2 matched t − 52k weeks, which drifts about a day per year, so the "same week" five years back was up to 6 days off. In transition months this mattered: for the week ending 13 Nov 2026 the drifted average was −25 Bcf against +27 calendar-aligned. Found while checking the first live forecast. A bug fix, not a tuning choice, so no settings were re-chosen on the holdout. It affects both the feature and the benchmark. |
 | 2026-11-17 | Model 1 v2 adds a holiday-week flag (Thanksgiving, Christmas, New Year) | Holiday weeks were the largest misses in the 2022+ holdout. **This was noticed in the holdout first.** It was then checked on 2018–2021, where 6 of 9 holiday weeks were also missed in the same direction (actual draw smaller than forecast). Both v1 and v2 holdout scores are reported. |
 
 ## Results log
@@ -75,6 +76,8 @@ A null result on Model 3 gets reported the same way, as a finding.
 | 2026-11-17 | Model 1 v2 (+holiday), gradient boosting | 14.9 | −54% | 88.4% | 19.21 |
 | 2026-11-18 | Model 1 v2, ridge, **own data** (EIA bulk file + own Open-Meteo pull), 253 weeks | 14.0 | −57% | 83.8% | 16.48 |
 | 2026-11-18 | Model 1 v2, gradient boosting, own data | 14.9 | −54% | 86.2% | 19.40 |
+| 2026-11-18 | **Model 1 v3 (calendar-aligned 5-yr average), ridge, own data** | **13.8** | −56% (vs 31.3) | 84.6% | 16.52 |
+| 2026-11-18 | Model 1 v3, gradient boosting, own data | 14.6 | −53% | 85.8% | — |
 
 Rows dated 2026-11-17 used development inputs cached in the HughFOD/gas-storage-nowcast repo. Rows dated 2026-11-18 use our own pulls: storage from the EIA bulk file (identical to the cached series in all 880 weeks), and degree days from Open-Meteo via `src/fetch.py` (correlation with the cached series 0.9997 for HDD and 0.998 for CDD over 1,142 weeks).
 
@@ -88,3 +91,16 @@ The loss differential is d_t = |benchmark miss| − |model miss|. Intervals use 
 | Ridge vs gradient boosting | 0.9 | −1.0 to 2.6 | 0.94 (0.84 to 1.07) | 0.9 |
 
 Conclusion: both models beat the 5-year average by a wide, well-determined margin. Ridge and gradient boosting are statistically tied, so "ridge wins" is a point estimate, not an established result.
+
+### Model 1 v3 (own data): block-bootstrap, 8-week blocks, holdout 2022+ (253 weeks)
+| Comparison | Advantage (Bcf/week) | 95% CI | MAE ratio (95% CI) | Newey–West t |
+| --- | --- | --- | --- | --- |
+| Ridge vs 5-year average | 17.5 | 11.0 to 24.3 | 0.44 (0.36 to 0.55) | 5.0 |
+| Gradient boosting vs 5-year average | 16.6 | 10.6 to 23.0 | 0.47 (0.40 to 0.57) | 5.1 |
+| Ridge vs gradient boosting | 0.9 | −0.9 to 2.8 | 0.94 (0.82 to 1.07) | 0.9 |
+
+The conclusions are unchanged from v2.
+
+### Live record
+- Run by GitHub Actions every Wednesday. The log is in `reports/live_forecasts.csv`.
+- The first live forecast (week ending 2026-11-13, made 2026-11-18) used v2 with the drifted 5-year average. It is kept as logged. From the next week, the live job uses v3.
