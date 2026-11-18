@@ -42,7 +42,12 @@ def same_week_prior_years(s: pd.Series, years=5) -> pd.Series:
 
 def load_raw():
     s = pd.read_csv(ROOT / "data/raw/storage.csv", parse_dates=["week_ending"]).set_index("week_ending")
-    w = pd.read_csv(ROOT / "data/raw/weekly_degree_days.csv", parse_dates=["week_ending"]).set_index("week_ending")
+    own = ROOT / "data/raw/weekly_degree_days_own.csv"  # our own pull (src/fetch.py)
+    if own.exists():
+        w = pd.read_csv(own, parse_dates=["week_ending"]).set_index("week_ending")
+        w["forecast_days"] = 0  # archive data: every week is observed weather
+    else:  # development copy from the HughFOD repo (not redistributed)
+        w = pd.read_csv(ROOT / "data/raw/weekly_degree_days.csv", parse_dates=["week_ending"]).set_index("week_ending")
     return s, w
 
 
@@ -196,6 +201,6 @@ def main(features=None, tag="v1"):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "v2":
-        main(FEATURES_V2, "v2")
+        main(FEATURES_V2, sys.argv[2] if len(sys.argv) > 2 else "v2")
     else:
         main(FEATURES, "v1")

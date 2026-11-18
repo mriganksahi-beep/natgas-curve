@@ -73,5 +73,7 @@ A null result on Model 3 gets reported the same way, as a finding.
 | 2026-11-17 | Model 1 v1, gradient boosting | 14.9 | −54% | 87.3% | 19.21 |
 | 2026-11-17 | Model 1 v2 (+holiday), ridge | 13.9 | −57% | 81.7% | 16.30 |
 | 2026-11-17 | Model 1 v2 (+holiday), gradient boosting | 14.9 | −54% | 88.4% | 19.21 |
+| 2026-11-18 | Model 1 v2, ridge, **own data** (EIA bulk file + own Open-Meteo pull), 253 weeks | 14.0 | −57% | 83.8% | 16.48 |
+| 2026-11-18 | Model 1 v2, gradient boosting, own data | 14.9 | −54% | 86.2% | 19.40 |
 
-Development inputs: EIA storage and weekly degree days cached in the public HughFOD/gas-storage-nowcast repo (its weights, not ours). To be rerun on our own pulls from `src/fetch.py`.
+Rows dated 2026-11-17 used development inputs cached in the HughFOD/gas-storage-nowcast repo. Rows dated 2026-11-18 use our own pulls: storage from the EIA bulk file (identical to the cached series in all 880 weeks), and degree days from Open-Meteo via `src/fetch.py` (correlation with the cached series 0.9997 for HDD and 0.998 for CDD over 1,142 weeks).

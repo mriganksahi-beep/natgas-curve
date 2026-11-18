@@ -6,8 +6,8 @@ The rules are fixed in [`reports/protocol.md`](reports/protocol.md): timing, sam
 
 ## Status (17 Nov 2026)
 - **Model 1, weekly storage change:** done, v2.
-  - Out-of-sample mean absolute error is **13.9 Bcf**, against **32.3** for the 5-year average, over 251 weeks from 2022.
-  - The 80% ranges cover 81.7% of outcomes.
+  - Out-of-sample mean absolute error is **14.0 Bcf**, against **32.2** for the 5-year average, over 253 weeks from 2022 (own data pulls).
+  - The 80% ranges cover 83.8% of outcomes.
   - Ridge beats gradient boosting.
 - **Model 2, end-of-season storage scenarios:** next.
 - **Model 3, futures spreads:** pending price data.
@@ -15,8 +15,8 @@ The rules are fixed in [`reports/protocol.md`](reports/protocol.md): timing, sam
 ## Run
 ```
 pip install -r requirements.txt
-export EIA_API_KEY=...            # free: eia.gov/opendata
-python -m src.fetch storage && python -m src.fetch weather && python -m src.fetch futures
+python -c "from src.fetch import from_bulk; from_bulk('NG.txt')"   # EIA bulk file, no key
+python -c "from src.fetch import fetch_weather, weekly_degree_days; weekly_degree_days(fetch_weather())"
 python -m src.model1 v2
 python -m pytest tests            # no-look-ahead checks
 ```
