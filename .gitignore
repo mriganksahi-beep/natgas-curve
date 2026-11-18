@@ -1,0 +1,7 @@
+data/raw/daily_temps.csv
+data/raw/consensus.csv
+__pycache__/
+.pytest_cache/
+*.zip
+reports/run_v*.txt
+data/raw/weekly_degree_days.csv
