@@ -13,6 +13,7 @@ Storage: refresh data/raw/storage.csv each week (EIA bulk file via src.fetch.fro
 or add the latest level by hand with `python -m src.live add-storage 2026-11-13 3900`.
 """
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,12 +35,21 @@ def recent_weather(days=16) -> pd.DataFrame:
     """Daily mean temperature for the last `days` days for each city (forecast API)."""
     frames = []
     for city, (lat, lon, _, _) in CITIES.items():
-        r = requests.get("https://api.open-meteo.com/v1/forecast",
-                         params={"latitude": lat, "longitude": lon,
-                                 "daily": "temperature_2m_mean", "temperature_unit": "fahrenheit",
-                                 "timezone": "America/New_York", "past_days": days, "forecast_days": 1},
-                         timeout=60)
-        r.raise_for_status()
+        for attempt in range(4):  # Open-Meteo occasionally times out; retry with backoff
+            try:
+                r = requests.get("https://api.open-meteo.com/v1/forecast",
+                                 params={"latitude": lat, "longitude": lon,
+                                         "daily": "temperature_2m_mean", "temperature_unit": "fahrenheit",
+                                         "timezone": "America/New_York", "past_days": days,
+                                         "forecast_days": 1},
+                                 timeout=90)
+                r.raise_for_status()
+                break
+            except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as e:
+                if attempt == 3:
+                    raise
+                print(f"{city}: {type(e).__name__}, retrying in {30 * (attempt + 1)}s")
+                time.sleep(30 * (attempt + 1))
         d = r.json()["daily"]
         frames.append(pd.DataFrame({"date": pd.to_datetime(d["time"]), "city": city,
                                     "temp_f": d["temperature_2m_mean"]}))
