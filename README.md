@@ -13,7 +13,7 @@ The rules are fixed in [`reports/protocol.md`](reports/protocol.md): timing, sam
 - **Model 3, futures spreads:** pending price data.
 
 ## Live record
-Each week, before EIA's Thursday 10:30 ET release, `python -m src.live forecast` logs a forecast to [`reports/live_forecasts.csv`](reports/live_forecasts.csv). The commit time is the timestamp. After the release, `python -m src.live score` fills in the actual.
+A GitHub Action ([`live_forecast.yml`](.github/workflows/live_forecast.yml)) runs every Wednesday at 12:00 UTC, before EIA's release. It refreshes storage from EIA's bulk file, scores last week's forecast, and commits this week's forecast to [`reports/live_forecasts.csv`](reports/live_forecasts.csv). The bot's commit time is the timestamp.
 
 ## Run
 ```

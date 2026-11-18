@@ -67,6 +67,13 @@ def forecast(daily=None, now=None):
         dd, source = w.loc[target, ["hdd", "cdd"]].to_dict(), "archive"
     else:
         dd, source = week_degree_days(daily if daily is not None else recent_weather(), target), "forecast-api past_days"
+    if source != "archive":  # keep this week's weather so later weeks have their lags
+        lp = ROOT / "data/raw/weekly_degree_days_live.csv"
+        lv = pd.read_csv(lp) if lp.exists() else pd.DataFrame(columns=["week_ending", "hdd", "cdd", "source"])
+        if target.date().isoformat() not in set(lv.week_ending.astype(str)):
+            lv = pd.concat([lv, pd.DataFrame([{"week_ending": target.date().isoformat(), **dd,
+                                               "source": source}])])
+            lv.to_csv(lp, index=False)
     w2 = pd.concat([w, pd.DataFrame([{**dd, "forecast_days": 0}], index=[target])])
     w2.index.name = "week_ending"
     s2 = pd.concat([s, pd.DataFrame({"storage_bcf": [np.nan]}, index=[target])])
@@ -129,11 +136,38 @@ def score():
               f"inside 80% range {100 * inside:.0f}%")
 
 
+def refresh_storage_from_eia_bulk():
+    """Download EIA's bulk natural gas file (no key) and update storage + prices."""
+    import io
+    import tempfile
+    import zipfile
+
+    from src.fetch import from_bulk
+    r = requests.get("https://api.eia.gov/bulk/NG.zip", timeout=300)
+    r.raise_for_status()
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z, tempfile.TemporaryDirectory() as d:
+        z.extract("NG.txt", d)
+        from_bulk(str(Path(d) / "NG.txt"))
+
+
+def auto():
+    """Weekly unattended run (GitHub Actions): refresh storage, score, forecast."""
+    refresh_storage_from_eia_bulk()
+    if LOG.exists():
+        score()
+    try:
+        forecast()
+    except ValueError as e:  # already logged, or week not finished: nothing to do
+        print("No new forecast:", e)
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "forecast"
     if cmd == "forecast":
         forecast()
     elif cmd == "score":
         score()
+    elif cmd == "auto":
+        auto()
     elif cmd == "add-storage":
         add_storage(sys.argv[2], sys.argv[3])
