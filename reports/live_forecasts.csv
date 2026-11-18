@@ -1,0 +1,2 @@
+forecast_made_utc,week_ending,forecast_bcf,lo80_bcf,hi80_bcf,five_year_avg_bcf,hdd,cdd,weather_source,actual_bcf,miss_bcf
+2026-11-18 15:18,2026-11-13,7,-14,34,-25,99.5,16.9,forecast-api past_days,,
