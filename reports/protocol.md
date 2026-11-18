@@ -64,6 +64,8 @@ A null result on Model 3 gets reported the same way, as a finding.
 ## Change log
 | Date | Change | Why |
 | --- | --- | --- |
+| 2026-11-18 | Model 2 v2: analog weather re-centred on the latest 10-year normal; Model 1 misses de-meaned before resampling | v1 was biased toward too much withdrawal: actual end-of-season storage came in above the median by +34 to +358 Bcf, depending on horizon. Diagnostics showed two causes. First, the analog years (2005 on) are colder than recent winters, by +42 HDD per season in 2018–21 and +80 in 2022+. Second, the pool of misses included 2016–17 forecasts from models trained on only 1–2 years, which ran about −12 Bcf/week. Both causes are visible in validation alone, and both fixes are standard practice rather than tuned values. **v1 holdout results had already been seen**, so v2's holdout score is not a clean first look. |
+| 2026-11-18 | Model 2: ablation, run on 2018–21 only, that stops simulated misses feeding the next week's lag features | No consistent gain: ranges were narrower and under-covered. Kept the feedback (v2). |
 | 2026-11-18 | Model 1 v3: the 5-year average now matches the same calendar date in each prior year | v1/v2 matched t − 52k weeks, which drifts about a day per year, so the "same week" five years back was up to 6 days off. In transition months this mattered: for the week ending 13 Nov 2026 the drifted average was −25 Bcf against +27 calendar-aligned. Found while checking the first live forecast. A bug fix, not a tuning choice, so no settings were re-chosen on the holdout. It affects both the feature and the benchmark. |
 | 2026-11-17 | Model 1 v2 adds a holiday-week flag (Thanksgiving, Christmas, New Year) | Holiday weeks were the largest misses in the 2022+ holdout. **This was noticed in the holdout first.** It was then checked on 2018–2021, where 6 of 9 holiday weeks were also missed in the same direction (actual draw smaller than forecast). Both v1 and v2 holdout scores are reported. |
 
@@ -104,3 +106,26 @@ The conclusions are unchanged from v2.
 ### Live record
 - Run by GitHub Actions every Wednesday. The log is in `reports/live_forecasts.csv`.
 - The first live forecast (week ending 2026-11-13, made 2026-11-18) used v2 with the drifted 5-year average. It is kept as logged. From the next week, the live job uses v3.
+
+### Model 2 v2: end-of-season storage (walk-forward; every week of each season is an origin)
+| Period | Weeks to go | Origins | Model 2 MAE | 5-yr path MAE | Inside 80% range | 80% width | Bias |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Validation 2018–21 | 1–4 | 32 | 64.8 | 59.5 | 81% | 198 | +7 |
+| | 5–8 | 32 | 126.7 | 119.2 | 72% | 490 | +6 |
+| | 9–12 | 33 | 156.5 | 145.2 | 88% | 771 | +46 |
+| | 13–16 | 32 | 242.3 | 192.8 | 94% | 987 | +165 |
+| | 17+ | 72 | 282.0 | 195.6 | 83% | 1,022 | +146 |
+| Holdout 2022+ | 1–4 | 40 | 40.4 | 46.2 | 90% | 186 | +27 |
+| | 5–8 | 40 | 77.4 | 101.0 | 90% | 455 | +40 |
+| | 9–12 | 39 | 180.2 | 171.7 | 85% | 667 | +8 |
+| | 13–16 | 36 | 238.8 | 195.9 | 89% | 833 | +32 |
+| | 17+ | 87 | 234.7 | 210.2 | 84% | 845 | −69 |
+
+Against the protocol's criteria:
+- **Calibration: met.** Coverage is 72–94%, slightly wide on average.
+- **Beating the 5-year path at 4, 8 and 12 weeks: partly met.**
+  - Holdout: beats it at 1–4 and 5–8 weeks, but not at 9–12.
+  - Validation: does not beat it at any horizon.
+  - Beyond 8 weeks the median adds nothing over the 5-year path. Its value is the calibrated range, not a better centre.
+
+Figure: `reports/figures/model2_fans.png`.
