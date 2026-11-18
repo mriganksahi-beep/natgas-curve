@@ -51,7 +51,8 @@ def load_raw():
     return s, w
 
 
-def build_features(s=None, w=None) -> pd.DataFrame:
+def build_features(s=None, w=None, keep_last_unknown=False) -> pd.DataFrame:
+    """keep_last_unknown: keep a final week whose storage is not yet reported (live use)."""
     if s is None:
         s, w = load_raw()
     w = w[w["forecast_days"] == 0][["hdd", "cdd"]]  # history only: no forecast weather
@@ -79,6 +80,9 @@ def build_features(s=None, w=None) -> pd.DataFrame:
     df["hdd_prev"] = df["hdd"].shift(1)
     # holiday weeks: industrial gas demand drops (Thanksgiving, Christmas, New Year)
     df["holiday"] = [int(holiday_in_week(t)) for t in df.index]
+    if keep_last_unknown:
+        feats = [c for c in df.columns if c not in ("storage_bcf", "chg")]
+        return df.dropna(subset=feats)
     return df.dropna()
 
 

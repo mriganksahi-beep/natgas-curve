@@ -12,6 +12,9 @@ The rules are fixed in [`reports/protocol.md`](reports/protocol.md): timing, sam
 - **Model 2, end-of-season storage scenarios:** next.
 - **Model 3, futures spreads:** pending price data.
 
+## Live record
+Each week, before EIA's Thursday 10:30 ET release, `python -m src.live forecast` logs a forecast to [`reports/live_forecasts.csv`](reports/live_forecasts.csv). The commit time is the timestamp. After the release, `python -m src.live score` fills in the actual.
+
 ## Run
 ```
 pip install -r requirements.txt
