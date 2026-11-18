@@ -76,23 +76,56 @@ CITIES = {
 BASE_F = 65.0
 
 
-def fetch_weather(start="2000-01-01", end=None) -> pd.DataFrame:
+WEATHER_CACHE = RAW / "weather_cache"
+
+
+class RateLimited(RuntimeError):
+    pass
+
+
+def fetch_weather(start="2004-12-01", end=None) -> pd.DataFrame:
+    """Daily mean temperature per city from the Open-Meteo archive.
+
+    Open-Meteo's free tier counts a multi-year request as many calls, so a full pull
+    can hit the hourly (and daily) limit part-way through. Each city is therefore saved
+    as soon as it arrives, and a rerun skips cities already saved. If the limit is hit,
+    wait about an hour and rerun; it picks up where it stopped.
+
+    start: 2004-12-01 is enough. Storage starts in 2010 and the 5-year weather norms
+    need the five years before that.
+    """
     end = end or (pd.Timestamp.today() - pd.Timedelta(days=6)).strftime("%Y-%m-%d")
-    frames = []
+    WEATHER_CACHE.mkdir(parents=True, exist_ok=True)
     for city, (lat, lon, _, _) in CITIES.items():
-        r = requests.get(
-            "https://archive-api.open-meteo.com/v1/archive",
-            params={"latitude": lat, "longitude": lon, "start_date": start, "end_date": end,
-                    "daily": "temperature_2m_mean", "temperature_unit": "fahrenheit",
-                    "timezone": "America/New_York"},
-            timeout=120,
-        )
+        path = WEATHER_CACHE / f"{city.replace(' ', '_')}.csv"
+        if path.exists():
+            continue
+        for attempt in range(3):
+            r = requests.get(
+                "https://archive-api.open-meteo.com/v1/archive",
+                params={"latitude": lat, "longitude": lon, "start_date": start, "end_date": end,
+                        "daily": "temperature_2m_mean", "temperature_unit": "fahrenheit",
+                        "timezone": "America/New_York"},
+                timeout=120,
+            )
+            if r.status_code != 429:
+                break
+            if attempt < 2:
+                print(f"{city}: rate limited, waiting 70s (attempt {attempt + 1} of 3)")
+                time.sleep(70)
+        if r.status_code == 429:
+            done = len(list(WEATHER_CACHE.glob("*.csv")))
+            raise RateLimited(
+                f"Open-Meteo limit reached with {done} of {len(CITIES)} cities saved. "
+                "Wait about an hour and rerun the same cell; saved cities are skipped. "
+                "If it still fails, the daily limit is used up: rerun tomorrow.")
         r.raise_for_status()
         d = r.json()["daily"]
-        frames.append(pd.DataFrame({"date": pd.to_datetime(d["time"]), "city": city,
-                                    "temp_f": d["temperature_2m_mean"]}))
-        time.sleep(1)
-    daily = pd.concat(frames)
+        pd.DataFrame({"date": d["time"], "city": city, "temp_f": d["temperature_2m_mean"]}
+                     ).to_csv(path, index=False)
+        print(f"saved {city}")
+        time.sleep(2)
+    daily = pd.concat(pd.read_csv(p, parse_dates=["date"]) for p in sorted(WEATHER_CACHE.glob("*.csv")))
     daily.to_csv(RAW / "daily_temps.csv", index=False)
     return daily
 

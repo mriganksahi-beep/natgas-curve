@@ -5,3 +5,4 @@ __pycache__/
 *.zip
 reports/run_v*.txt
 data/raw/weekly_degree_days.csv
+data/raw/weather_cache/
