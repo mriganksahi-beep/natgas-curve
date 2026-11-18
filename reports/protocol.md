@@ -77,3 +77,14 @@ A null result on Model 3 gets reported the same way, as a finding.
 | 2026-11-18 | Model 1 v2, gradient boosting, own data | 14.9 | −54% | 86.2% | 19.40 |
 
 Rows dated 2026-11-17 used development inputs cached in the HughFOD/gas-storage-nowcast repo. Rows dated 2026-11-18 use our own pulls: storage from the EIA bulk file (identical to the cached series in all 880 weeks), and degree days from Open-Meteo via `src/fetch.py` (correlation with the cached series 0.9997 for HDD and 0.998 for CDD over 1,142 weeks).
+
+### Model 1 v2 (own data): block-bootstrap confidence intervals, holdout 2022+ (253 weeks)
+The loss differential is d_t = |benchmark miss| − |model miss|. Intervals use a moving block bootstrap with 8-week blocks and 10,000 resamples. Blocks of 1, 4, 13 and 26 weeks are in `reports/model1_bootstrap_v2_own.csv`, and the conclusions are unchanged across all of them.
+
+| Comparison | Advantage (Bcf/week) | 95% CI | MAE ratio (95% CI) | Newey–West t |
+| --- | --- | --- | --- | --- |
+| Ridge vs 5-year average | 18.2 | 11.8 to 24.7 | 0.44 (0.37 to 0.54) | 5.2 |
+| Gradient boosting vs 5-year average | 17.3 | 11.5 to 23.5 | 0.46 (0.39 to 0.55) | 5.4 |
+| Ridge vs gradient boosting | 0.9 | −1.0 to 2.6 | 0.94 (0.84 to 1.07) | 0.9 |
+
+Conclusion: both models beat the 5-year average by a wide, well-determined margin. Ridge and gradient boosting are statistically tied, so "ridge wins" is a point estimate, not an established result.

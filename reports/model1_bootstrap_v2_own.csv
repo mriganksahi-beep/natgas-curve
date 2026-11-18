@@ -1,0 +1,16 @@
+comparison,block (weeks),advantage (Bcf),95% CI low,95% CI high,share of resamples <= 0 (%),MAE ratio,ratio CI low,ratio CI high,Newey-West t (8 lags)
+Ridge vs 5-year average,1,18.212,14.479,22.164,0.0,0.435,0.379,0.499,5.246
+Ridge vs 5-year average,4,18.212,13.101,23.52,0.0,0.435,0.369,0.519,5.246
+Ridge vs 5-year average,8,18.212,11.839,24.724,0.0,0.435,0.365,0.54,5.246
+Ridge vs 5-year average,13,18.212,10.86,25.966,0.0,0.435,0.357,0.559,5.246
+Ridge vs 5-year average,26,18.212,10.961,26.421,0.0,0.435,0.356,0.558,5.246
+Gradient boosting vs 5-year average,1,17.345,13.975,20.849,0.0,0.462,0.41,0.522,5.428
+Gradient boosting vs 5-year average,4,17.345,12.766,22.275,0.0,0.462,0.401,0.532,5.428
+Gradient boosting vs 5-year average,8,17.345,11.492,23.475,0.0,0.462,0.393,0.552,5.428
+Gradient boosting vs 5-year average,13,17.345,10.59,24.68,0.0,0.462,0.385,0.569,5.428
+Gradient boosting vs 5-year average,26,17.345,10.762,25.174,0.0,0.462,0.386,0.567,5.428
+Ridge vs gradient boosting,1,0.867,-0.878,2.723,17.38,0.942,0.831,1.064,0.935
+Ridge vs gradient boosting,4,0.867,-0.914,2.667,18.27,0.942,0.832,1.066,0.935
+Ridge vs gradient boosting,8,0.867,-0.973,2.649,20.12,0.942,0.836,1.071,0.935
+Ridge vs gradient boosting,13,0.867,-1.028,2.645,20.73,0.942,0.838,1.075,0.935
+Ridge vs gradient boosting,26,0.867,-0.839,2.513,17.15,0.942,0.846,1.061,0.935
