@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.model1 import FEATURES_V2, build_features, load_raw, ridge, walk_forward
+from src.model1 import FEATURES_V2, build_features, holiday_in_week, load_raw, ridge, walk_forward
 
 ROOT = Path(__file__).resolve().parents[1]
 ALPHA = 0.1
@@ -76,10 +76,31 @@ class Simulator:
         wf = walk_forward(self.df, ridge(ALPHA), pd.Timestamp("2016-01-01"), features=FEATURES_V2)
         self.resid = (self.df.loc[wf.index, "chg"] - wf).rename("resid")
 
+    def _calendar_row(self, d):
+        """Calendar inputs for a week not yet in the data (live use), built exactly as in
+        Model 1: same calendar date in each of the previous 5 years, nearest week +-3 days."""
+        chg = self.s["storage_bcf"].diff()
+        out = {}
+        for name, series in (("chg_5y", chg), ("hdd_5y", self.w["hdd"]), ("cdd_5y", self.w["cdd"])):
+            vals = []
+            for k in range(1, 6):
+                a = nearest(series.index, d - pd.DateOffset(years=k))
+                if a is not None and not np.isnan(series[a]):
+                    vals.append(series[a])
+            if len(vals) < 5:
+                raise ValueError(f"not enough history for {name} at {d.date()}")
+            out[name] = float(np.mean(vals))
+        doy = d.dayofyear
+        out["sin"], out["cos"] = np.sin(2 * np.pi * doy / 365.25), np.cos(2 * np.pi * doy / 365.25)
+        out["holiday"] = int(holiday_in_week(d))
+        return pd.Series(out, name=d)
+
     def _future_rows(self, t, T):
         """Calendar-only inputs for each future week (all from past years -> no leakage)."""
+        cols = ["chg_5y", "hdd_5y", "cdd_5y", "sin", "cos", "holiday"]
         weeks = pd.date_range(t + pd.Timedelta(days=7), T, freq="7D")
-        fut = self.df.reindex(weeks)[["chg_5y", "hdd_5y", "cdd_5y", "sin", "cos", "holiday"]]
+        rows = [self.df.loc[d, cols] if d in self.df.index else self._calendar_row(d) for d in weeks]
+        fut = pd.DataFrame(rows, index=weeks)[cols]
         if fut.isna().any().any():
             raise ValueError("calendar inputs missing for some future week")
         return fut
@@ -204,6 +225,33 @@ class Simulator:
                 "levels": level}
 
 
+def live_end_of_season(now=None):
+    """Forecast end-of-season storage from the latest reported week; append to the log."""
+    from datetime import datetime, timezone
+    log_path = ROOT / "reports/live_end_of_season.csv"
+    sim = Simulator()
+    t = sim.df.index.max()  # latest week with reported storage and weather
+    r = sim.simulate(t)
+    if r is None:
+        print("No season target from", t.date())
+        return None
+    now = now or datetime.now(timezone.utc)
+    row = {"forecast_made_utc": pd.Timestamp(now).strftime("%Y-%m-%d %H:%M"),
+           "origin_week": t.date().isoformat(), "target_week": r["target"].date().isoformat(),
+           "weeks_to_go": r["weeks_to_go"], "p10_bcf": round(r["p10"]), "median_bcf": round(r["median"]),
+           "p90_bcf": round(r["p90"]), "five_year_path_bcf": round(r["benchmark"]),
+           "prob_below_five_year_path": round(float((r["levels"] < r["benchmark"]).mean()), 2),
+           "n_scenarios": r["n_scenarios"], "model": "Model 2 v2"}
+    log = pd.read_csv(log_path) if log_path.exists() else pd.DataFrame(columns=list(row))
+    if ((log["origin_week"] == row["origin_week"]) & (log["target_week"] == row["target_week"])).any():
+        print("End-of-season forecast already logged for origin", row["origin_week"])
+        return None
+    pd.concat([log, pd.DataFrame([row])], ignore_index=True).to_csv(log_path, index=False)
+    print(f"End-of-season ({row['target_week']}) from {row['origin_week']}: median {row['median_bcf']} Bcf, "
+          f"80% range {row['p10_bcf']}-{row['p90_bcf']}; 5-yr path {row['five_year_path_bcf']}")
+    return row
+
+
 def backtest(start=VAL_START, with_resid=True, seed=0):
     sim = Simulator(seed=seed)
     rows = []
@@ -247,6 +295,9 @@ def summarize(bt):
 
 if __name__ == "__main__":
     import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "live":
+        live_end_of_season()
+        sys.exit()
     tag = sys.argv[1] if len(sys.argv) > 1 else "v1"
     bt = backtest()
     bt.to_csv(ROOT / f"data/processed/model2_backtest_{tag}.csv", index=False)

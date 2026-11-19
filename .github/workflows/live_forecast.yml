@@ -25,6 +25,6 @@ jobs:
         run: |
           git config user.name "live-forecast-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add reports/live_forecasts.csv data/raw/storage.csv data/raw/eia_futures_c1_c4.csv data/raw/henry_hub_spot.csv data/raw/weekly_degree_days_live.csv 2>/dev/null || true
+          git add reports/live_forecasts.csv reports/live_end_of_season.csv data/raw/storage.csv data/raw/eia_futures_c1_c4.csv data/raw/henry_hub_spot.csv data/raw/weekly_degree_days_live.csv 2>/dev/null || true
           if git diff --cached --quiet; then echo "Nothing to commit"; else
             git commit -m "Live forecast $(date -u +%Y-%m-%dT%H:%MZ)" && git push; fi

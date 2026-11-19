@@ -169,6 +169,11 @@ def auto():
         forecast()
     except ValueError as e:  # already logged, or week not finished: nothing to do
         print("No new forecast:", e)
+    try:  # Model 2: end-of-season storage from the latest reported week
+        from src.model2 import live_end_of_season
+        live_end_of_season()
+    except Exception as e:  # never let Model 2 block the weekly Model 1 forecast
+        print("End-of-season forecast skipped:", type(e).__name__, e)
 
 
 if __name__ == "__main__":

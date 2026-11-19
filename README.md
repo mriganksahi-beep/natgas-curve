@@ -15,7 +15,7 @@ The rules are fixed in [`reports/protocol.md`](reports/protocol.md): timing, sam
 - **Model 3, futures spreads:** pending price data.
 
 ## Live record
-A GitHub Action ([`live_forecast.yml`](.github/workflows/live_forecast.yml)) runs every Wednesday at 12:00 UTC, before EIA's release. It refreshes storage from EIA's bulk file, scores last week's forecast, and commits this week's forecast to [`reports/live_forecasts.csv`](reports/live_forecasts.csv). The bot's commit time is the timestamp.
+A GitHub Action ([`live_forecast.yml`](.github/workflows/live_forecast.yml)) runs every Wednesday at 12:00 UTC, before EIA's release. It refreshes storage from EIA's bulk file, scores last week's forecast, and commits this week's forecast to [`reports/live_forecasts.csv`](reports/live_forecasts.csv). The bot's commit time is the timestamp. The same run also logs Model 2's end-of-season forecast to [`reports/live_end_of_season.csv`](reports/live_end_of_season.csv).
 
 ## Run
 ```
@@ -27,3 +27,5 @@ python -m pytest tests            # no-look-ahead checks
 ```
 
 ![Model 1 holdout](reports/figures/model1_holdout.png)
+
+![Model 2 fans](reports/figures/model2_fans.png)
