@@ -170,17 +170,6 @@ if __name__ == "__main__":
         print(fetch_eia_futures().tail())
 
 
-# --- 4. Databento: price check before pulling named Henry Hub contracts -----------------
-def databento_cost(start="2010-06-06", end="2026-11-01"):
-    """Daily OHLCV for every NG contract on CME Globex. Prints the cost; downloads nothing.
-    Needs `pip install databento` and DATABENTO_API_KEY."""
-    import databento as db
-    client = db.Historical(os.environ["DATABENTO_API_KEY"])
-    kw = dict(dataset="GLBX.MDP3", symbols=["NG.FUT"], stype_in="parent",
-              schema="ohlcv-1d", start=start, end=end)
-    print("Estimated cost (USD):", client.metadata.get_cost(**kw))
-    print("Estimated size (bytes):", client.metadata.get_billable_size(**kw))
-    return kw
 
 
 # --- 5. Alternative to 1 and 3: EIA bulk file (no API key) ------------------------------

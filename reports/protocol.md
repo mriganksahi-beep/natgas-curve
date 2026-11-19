@@ -136,3 +136,68 @@ Known weakness: ranges made at the start of winter (19 or more weeks to go) are 
 - From 2026-11-19, the weekly job also logs Model 2's forecast of end-of-season storage to `reports/live_end_of_season.csv`. Each row gives the median, the 80% range, the 5-year path, and the probability of finishing below that path.
 - For weeks not yet in the data, the calendar inputs are rebuilt with the same rule as Model 1. They were checked to match Model 1 exactly on three historical weeks.
 - First entry, from storage through 2026-11-06: end-March 2027 median 1,968 Bcf, 80% range 1,253–2,688 Bcf, 5-year path 1,922 Bcf.
+
+### Model 2 simulation noise (2026-11-19)
+- The median is a Monte Carlo estimate. With 40 miss paths, rerunning with a different random seed moved the median by about 25 Bcf on average, and by up to 132 Bcf.
+- The default is now 200 paths, which cuts the seed-to-seed change to 11 Bcf on average (95th percentile 32).
+- Backtest scores are unchanged to within about 2 Bcf. Results are in `data/processed/model2_backtest_v2b_from2016.csv`, which now starts in November 2016 so that Model 3 has more winters.
+- The first live end-of-season row (2026-11-19) used 40 paths and stays as logged.
+
+---
+
+## Model 3: storage view vs the futures curve (pre-registered 2026-11-19, before any contract-level price data was loaded)
+
+### Question
+Does the futures market's end-of-winter spread move toward what the public storage view implies? Put concretely: when the March–April spread is rich or cheap relative to a storage-based fair value, does it then move back?
+
+### Data and timing
+- **Prices:** daily CME settlement prices of named Henry Hub contracts from Databento's `statistics` schema (`src/prices.py`).
+  - These are checked against EIA's contract-1 series, where the two overlap, before any use.
+  - The futures roll does not affect the primary spread, because both legs are fixed named contracts.
+- **Primary target:** S = March minus April settlement, same delivery year (H–J), in $/MMBtu.
+- **Observation dates:** each EIA storage Thursday, using that day's settlement.
+  - The storage report comes out at 10:30 ET, before the 14:30 ET settlement, so the report is public when S_t is observed.
+  - The first observation in each winter is the first Thursday on or after 1 November. The last is the last Thursday at least 25 calendar days before the March contract expires, so that the 4-week horizon ends before expiry.
+- **Horizons:** h = 1 and 4 weeks. Target: ΔS = S(t+h) − S(t).
+
+### Inputs at date t (all known by that Thursday's settlement)
+1. **Model 2 v2b on storage through the week just reported:**
+   - the end-March median, minus the 5-year average of end-March storage (the expected surplus)
+   - the 10th percentile, minus the same 5-year average (downside tightness)
+2. The April settlement price. Spreads in $ scale with the price level.
+3. Weeks to the March contract's expiry.
+4. The spread itself, S_t. It enters only through the gap below.
+
+### Fair value and the gap
+- For each method, fit S on inputs 1–3 using only earlier winters (walk-forward by winter, refit each November), giving fair value F̂_t. The gap is G_t = S_t − F̂_t.
+- **Prediction:** ΔS forecast = −b·G_t, with b fit on earlier winters.
+- **Methods compared:**
+  - (a) Random walk, ΔS = 0. This is the benchmark.
+  - (b) Linear fair value.
+  - (c) Convex fair value: S = c0 + c1·exp(−c2 · expected surplus), plus a price-level term. This is the theory-of-storage shape.
+  - (d) Spline (GAM) in expected surplus.
+  - (e) Gradient boosting.
+  - (f) A small PyTorch MLP: 2 hidden layers of 16 units, weight decay, early stopping on the last training winter.
+- Settings for (d)–(f) are chosen on validation winters only.
+
+### Samples
+| Period | Use |
+| --- | --- |
+| Winters 2016–17 to 2020–21 | Training and validation. Origins before 1 Jan 2022 |
+| Origins on or after 1 Jan 2022 | Holdout (part of winter 2021–22, then 2022–23 to 2025–26). Scored once per method version |
+
+There are about 15 observations per winter, roughly 150 in total. Observations overlap at h = 4, so every interval uses whole winters as bootstrap blocks and HAC errors.
+
+### Success criteria (each method vs the random walk, holdout)
+1. Out-of-sample R² for ΔS is above 0, with a one-sided Diebold–Mariano p-value below 0.05 (HAC errors, lags = h).
+2. Strategy:
+   - The position is −sign(G_t) in 1 spread (short March and long April when rich), held h weeks.
+   - Costs are 2, 4, 6 and 10 ticks round trip per leg (1 tick = $0.001/MMBtu = $10 per contract).
+   - The test is mean P&L per trade > 0 at 4 ticks, with a winter-block bootstrap 95% CI reported.
+3. Both are reported for h = 1 and h = 4, with and without winter 2021–22.
+
+A null result is reported the same way. With about 70 holdout observations, only a large effect could clear these bars, so the confidence intervals are the main output.
+
+### Secondary target (reported separately, same procedure)
+- The October–January spread (V–F), in delivery-year pairs.
+- Inputs: Model 2's end-October forecast from summer origins (April–September).

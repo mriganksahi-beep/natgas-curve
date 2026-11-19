@@ -66,7 +66,7 @@ def nearest(index: pd.DatetimeIndex, date, tol=3):
 
 
 class Simulator:
-    def __init__(self, n_resid_paths=40, block=4, seed=0):
+    def __init__(self, n_resid_paths=200, block=4, seed=0):
         self.s, self.w = load_raw()
         self.df = build_features(self.s, self.w)
         self.n_resid_paths, self.block = n_resid_paths, block
