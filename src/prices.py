@@ -7,8 +7,12 @@ so settlements come from the `statistics` schema instead.
 Use (Colab):
     pip install databento
     export DATABENTO_API_KEY=...
-    python -m src.prices cost        # prints the price of the pull; downloads nothing
-    python -m src.prices pull        # downloads, keeps outright contracts, saves CSV
+    python -m src.prices cost        # price of the targeted pull; downloads nothing
+    python -m src.prices pull        # downloads only the contracts Model 3 needs, saves CSV
+
+Why targeted: the whole NG parent feed (`NG.FUT`) in the statistics schema is ~9 GB
+(thousands of exchange-listed spreads and intraday statistic updates). Model 3 needs only
+four contracts per year, each over the months it is used, which is a few MB.
 
 NOT YET RUN against Databento (the build machine cannot reach it). Check the first pull.
 """
@@ -34,6 +38,65 @@ def cost(start="2010-06-06", end=None):
         c = client.metadata.get_cost(**kw)
         size = client.metadata.get_billable_size(**kw)
         print(f"{schema:12s} cost ${c:,.2f}   size {size / 1e6:,.1f} MB")
+
+
+def contract_windows(first_year=2011, last_year=None):
+    """(raw_symbol, contract_year, contract_month, start, end) for the contracts Model 3 uses.
+
+    Primary:   March (H) and April (J) of year Y, from 1 Aug of Y-1 to 1 Mar of Y.
+    Secondary: October (V) of Y and January (F) of Y+1, from 1 Mar to 1 Nov of Y.
+    The single-digit CME year code is unambiguous inside each window.
+    """
+    last_year = last_year or pd.Timestamp.today().year + 1
+    today = pd.Timestamp.today().normalize()
+    out = []
+    for y in range(first_year, last_year + 1):
+        d = y % 10
+        for code, month, start, end in (("H", 3, f"{y - 1}-08-01", f"{y}-03-01"),
+                                        ("J", 4, f"{y - 1}-08-01", f"{y}-03-01")):
+            out.append((f"NG{code}{d}", y, month, start, end))
+        out.append((f"NGV{d}", y, 10, f"{y}-03-01", f"{y}-11-01"))
+        out.append((f"NGF{(y + 1) % 10}", y + 1, 1, f"{y}-03-01", f"{y}-11-01"))
+    out = [(s, cy, cm, a, min(pd.Timestamp(b), today).strftime("%Y-%m-%d"))
+           for s, cy, cm, a, b in out if pd.Timestamp(a) < today]
+    return out
+
+
+def cost_contracts(first_year=2011):
+    import databento as db
+    client = db.Historical(os.environ["DATABENTO_API_KEY"])
+    total_cost = total_size = 0.0
+    for sym, cy, cm, a, b in contract_windows(first_year):
+        kw = dict(dataset="GLBX.MDP3", symbols=[sym], stype_in="raw_symbol",
+                  schema="statistics", start=a, end=b)
+        total_cost += client.metadata.get_cost(**kw)
+        total_size += client.metadata.get_billable_size(**kw)
+    print(f"Targeted pull: {len(contract_windows(first_year))} contract windows, "
+          f"cost ${total_cost:,.2f}, size {total_size / 1e6:,.1f} MB")
+
+
+def pull_contracts(first_year=2011):
+    import databento as db
+    client = db.Historical(os.environ["DATABENTO_API_KEY"])
+    frames = []
+    for sym, cy, cm, a, b in contract_windows(first_year):
+        data = client.timeseries.get_range(dataset="GLBX.MDP3", symbols=[sym], stype_in="raw_symbol",
+                                           schema="statistics", start=a, end=b)
+        df = data.to_df()
+        if df.empty:
+            print(f"{sym} {a}..{b}: no data")
+            continue
+        st = df[df["stat_type"] == db.StatType.SETTLEMENT_PRICE].copy()
+        st["date"] = (pd.to_datetime(st["ts_ref"]).dt.tz_convert("America/Chicago")
+                      .dt.normalize().dt.tz_localize(None))
+        st = st.sort_index().groupby("date", as_index=False).last()[["date", "price"]]
+        st["symbol"], st["contract_year"], st["contract_month"] = sym, cy, cm
+        frames.append(st.rename(columns={"price": "settle"}))
+        print(f"{sym} ({cy}-{cm:02d}): {len(st)} settlements {st.date.min().date()}..{st.date.max().date()}")
+    out = (pd.concat(frames).drop_duplicates(["date", "contract_year", "contract_month"], keep="last")
+           .sort_values(["contract_year", "contract_month", "date"]))
+    out[["date", "symbol", "contract_year", "contract_month", "settle"]].to_csv(RAW / "ng_settlements.csv", index=False)
+    return out
 
 
 def contract_from_symbol(sym: str, trade_date: pd.Timestamp):
@@ -90,22 +153,28 @@ def spread_panel(settles: pd.DataFrame, near_month=3, far_month=4) -> pd.DataFra
 
 
 def cross_check_with_eia(settles: pd.DataFrame) -> pd.DataFrame:
-    """Compare against EIA's contract 1-4 series (to April 2024): front-month settles should match."""
+    """Each February (1st-20th) March is EIA's contract 1 and April its contract 2.
+    Our Databento settlements should match those EIA series (available to April 2024)."""
     eia = pd.read_csv(RAW / "eia_futures_c1_c4.csv", parse_dates=["date"]).set_index("date")
     s = settles.copy()
-    s["ym"] = s.contract_year * 12 + s.contract_month
-    first = s.sort_values("ym").groupby("date").first()["settle"]
-    j = eia[["c1"]].join(first.rename("databento_front"), how="inner")
-    j["diff"] = j.databento_front - j.c1
-    print(f"{len(j)} common days; median |diff| {j['diff'].abs().median():.4f}; "
-          f"days with |diff| > 0.01: {(j['diff'].abs() > 0.01).sum()}")
-    return j
+    s["date"] = pd.to_datetime(s["date"])
+    feb = s[(s.date.dt.month == 2) & (s.date.dt.day <= 20) & (s.contract_year == s.date.dt.year)]
+    h = feb[feb.contract_month == 3].set_index("date")["settle"].rename("march")
+    j = feb[feb.contract_month == 4].set_index("date")["settle"].rename("april")
+    c = eia[["c1", "c2"]].join(h, how="inner").join(j, how="inner")
+    c["diff_c1"], c["diff_c2"] = c.march - c.c1, c.april - c.c2
+    print(f"Cross-check vs EIA (February days, {c.index.year.min()}-{c.index.year.max()}): {len(c)} days; "
+          f"max |March - c1| {c.diff_c1.abs().max():.4f}, max |April - c2| {c.diff_c2.abs().max():.4f}; "
+          f"days off by > $0.005: {((c.diff_c1.abs() > 0.005) | (c.diff_c2.abs() > 0.005)).sum()}")
+    return c
 
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "cost"
     if cmd == "cost":
+        cost_contracts()
+    elif cmd == "cost-full-feed":
         cost()
     elif cmd == "pull":
-        out = pull()
+        out = pull_contracts()
         cross_check_with_eia(out)
