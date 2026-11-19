@@ -1,14 +1,15 @@
-"""Download raw data from the original free sources.
+"""Download the raw inputs from free public sources.
 
-Run this on your own machine or Colab (the sources are public; EIA needs a free API key
-from https://www.eia.gov/opendata/register.php, set as the EIA_API_KEY env variable).
+Storage and EIA futures (no key needed): download NG.zip from
+https://www.eia.gov/opendata/bulkfiles.php, unzip NG.txt, then
+    python -c "from src.fetch import from_bulk; from_bulk('NG.txt')"
+The weekly GitHub Action does this automatically (src/live.py: refresh_storage_from_eia_bulk).
 
-    python -m src.fetch storage
-    python -m src.fetch weather
-    python -m src.fetch futures
+Weather (Open-Meteo archive, no key; resumable under its rate limits):
+    python -c "from src.fetch import fetch_weather, weekly_degree_days; weekly_degree_days(fetch_weather())"
 
-NOTE: written against the documented endpoints but not yet run end-to-end
-(the build machine could not reach eia.gov / open-meteo.com). Check the first pull by eye.
+Older helpers fetch_storage (EIA API, needs EIA_API_KEY) and fetch_eia_futures (EIA xls)
+are kept as alternatives. Contract-level futures prices: src/prices.py (Databento).
 """
 import os
 import sys

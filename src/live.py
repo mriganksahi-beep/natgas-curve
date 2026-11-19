@@ -1,16 +1,20 @@
-"""Weekly live forecast of the EIA storage change, published before the release.
+"""Weekly live forecast of the EIA storage change, logged before the release.
 
-EIA publishes the storage change for the week ending last Friday on Thursday at 10:30
-New York time (21:00 IST in winter, 20:00 IST in summer). Run this before then:
+What is forecast: the CHANGE in Lower-48 working gas storage (Bcf) for the week EIA
+reports next (positive = net injection, negative = net withdrawal). EIA publishes it on
+Thursday at 10:30 New York time (Wednesday in some holiday weeks).
 
+Runs unattended: .github/workflows/live_forecast.yml calls `python -m src.live auto`
+every Wednesday 12:00 UTC (refresh storage -> score last week -> forecast this week).
+Manual use:
     python -m src.live forecast            # forecast the next unreported week
-    python -m src.live score               # after release: fill in actuals
+    python -m src.live score               # fill in actuals once EIA has reported
+    python -m src.live add-storage 2026-11-13 3900   # add a reported level by hand
 
-Weather for the recent days comes from Open-Meteo's forecast API (`past_days`), because
-its archive lags by about five days. That source is model analysis rather than the
-reanalysis used in training; the difference is logged per forecast.
-Storage: refresh data/raw/storage.csv each week (EIA bulk file via src.fetch.from_bulk),
-or add the latest level by hand with `python -m src.live add-storage 2026-11-13 3900`.
+Weather for the most recent days comes from Open-Meteo's forecast API (`past_days`),
+because its archive lags by about five days. It is a model analysis rather than the
+reanalysis used in training; each row records which source was used.
+Column meanings: reports/README.md.
 """
 import sys
 import time
@@ -27,8 +31,10 @@ from src.model1 import FEATURES_V2, build_features, load_raw, ridge
 ROOT = Path(__file__).resolve().parents[1]
 LOG = ROOT / "reports/live_forecasts.csv"
 ALPHA = 0.1  # chosen on 2018-2021 (protocol.md); frozen for live use
-COLS = ["forecast_made_utc", "week_ending", "forecast_bcf", "lo80_bcf", "hi80_bcf",
-        "five_year_avg_bcf", "hdd", "cdd", "weather_source", "actual_bcf", "miss_bcf"]
+COLS = ["forecast_made_utc", "week_ending", "forecast_change_bcf", "lo80_change_bcf", "hi80_change_bcf",
+        "five_year_avg_change_bcf", "prior_week_level_bcf", "forecast_level_bcf", "hdd", "cdd",
+        "weather_source", "model", "actual_change_bcf", "miss_bcf", "note"]
+MODEL_NAME = "Model 1 v3 (ridge)"
 
 
 def recent_weather(days=16) -> pd.DataFrame:
@@ -101,19 +107,22 @@ def forecast(daily=None, now=None):
     err = (wf["actual"] - wf[col]).dropna()
     lo, hi = point + err.quantile(0.1), point + err.quantile(0.9)
 
+    prior = float(s["storage_bcf"].iloc[-1])
     row = {"forecast_made_utc": pd.Timestamp(now).strftime("%Y-%m-%d %H:%M"),
-           "week_ending": target.date().isoformat(), "forecast_bcf": round(point),
-           "lo80_bcf": round(lo), "hi80_bcf": round(hi),
-           "five_year_avg_bcf": round(float(df.loc[target, "chg_5y"])),
-           "hdd": dd["hdd"], "cdd": dd["cdd"], "weather_source": source,
-           "actual_bcf": np.nan, "miss_bcf": np.nan}
-    log = pd.read_csv(LOG) if LOG.exists() else pd.DataFrame(columns=COLS)
+           "week_ending": target.date().isoformat(), "forecast_change_bcf": round(point),
+           "lo80_change_bcf": round(lo), "hi80_change_bcf": round(hi),
+           "five_year_avg_change_bcf": round(float(df.loc[target, "chg_5y"])),
+           "prior_week_level_bcf": round(prior), "forecast_level_bcf": round(prior + point),
+           "hdd": dd["hdd"], "cdd": dd["cdd"], "weather_source": source, "model": MODEL_NAME,
+           "actual_change_bcf": np.nan, "miss_bcf": np.nan, "note": ""}
+    log = pd.read_csv(LOG, keep_default_na=False, na_values=[""]) if LOG.exists() else pd.DataFrame(columns=COLS)
     if (log["week_ending"] == row["week_ending"]).any():
         raise ValueError(f"A forecast for {row['week_ending']} is already logged; not overwriting")
     pd.concat([log, pd.DataFrame([row])], ignore_index=True)[COLS].to_csv(LOG, index=False)
-    print(f"Week ending {row['week_ending']}: forecast {row['forecast_bcf']:+d} Bcf "
-          f"(80% range {row['lo80_bcf']:+d} to {row['hi80_bcf']:+d}); "
-          f"5-year average {row['five_year_avg_bcf']:+d}; HDD {dd['hdd']}, CDD {dd['cdd']} [{source}]")
+    print(f"Week ending {row['week_ending']}: storage change forecast {row['forecast_change_bcf']:+d} Bcf "
+          f"(80% range {row['lo80_change_bcf']:+d} to {row['hi80_change_bcf']:+d}; "
+          f"5-year average {row['five_year_avg_change_bcf']:+d}), "
+          f"implied level {row['forecast_level_bcf']:,} Bcf; HDD {dd['hdd']}, CDD {dd['cdd']} [{source}]")
     return row
 
 
@@ -134,14 +143,16 @@ def score():
     log = pd.read_csv(LOG)
     for i, r in log.iterrows():
         t = pd.Timestamp(r.week_ending)
-        if pd.isna(r.actual_bcf) and t in chg.index:
-            log.loc[i, "actual_bcf"] = chg[t]
-            log.loc[i, "miss_bcf"] = chg[t] - r.forecast_bcf
+        if pd.isna(r.actual_change_bcf) and t in chg.index:
+            log.loc[i, "actual_change_bcf"] = chg[t]
+            log.loc[i, "miss_bcf"] = chg[t] - r.forecast_change_bcf
     log.to_csv(LOG, index=False)
-    done = log.dropna(subset=["actual_bcf"])
+    done = log.dropna(subset=["actual_change_bcf"])
     if len(done):
-        print(done[["week_ending", "forecast_bcf", "lo80_bcf", "hi80_bcf", "actual_bcf", "miss_bcf"]].to_string(index=False))
-        inside = ((done.actual_bcf >= done.lo80_bcf) & (done.actual_bcf <= done.hi80_bcf)).mean()
+        print(done[["week_ending", "forecast_change_bcf", "lo80_change_bcf", "hi80_change_bcf",
+                    "actual_change_bcf", "miss_bcf"]].to_string(index=False))
+        inside = ((done.actual_change_bcf >= done.lo80_change_bcf)
+                  & (done.actual_change_bcf <= done.hi80_change_bcf)).mean()
         print(f"Live record: {len(done)} weeks, MAE {done.miss_bcf.abs().mean():.1f} Bcf, "
               f"inside 80% range {100 * inside:.0f}%")
 

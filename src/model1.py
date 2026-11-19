@@ -210,8 +210,10 @@ def main(features=None, tag="v1"):
 
 
 if __name__ == "__main__":
+    # python -m src.model1          -> current model (v3: holiday flag, calendar-aligned 5-yr average)
+    # python -m src.model1 v1       -> original feature set, for the record
     import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "v2":
-        main(FEATURES_V2, sys.argv[2] if len(sys.argv) > 2 else "v2")
-    else:
+    if len(sys.argv) > 1 and sys.argv[1] == "v1":
         main(FEATURES, "v1")
+    else:
+        main(FEATURES_V2, "v3_own")

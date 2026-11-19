@@ -298,11 +298,9 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "live":
         live_end_of_season()
         sys.exit()
-    tag = sys.argv[1] if len(sys.argv) > 1 else "v1"
-    bt = backtest()
+    # python -m src.model2          -> current backtest (v2b: 200 miss paths, origins from Nov 2016)
+    # python -m src.model2 live     -> log a live end-of-season forecast
+    tag, start = "v2b_from2016", pd.Timestamp("2016-11-01")
+    bt = backtest(start=start)
     bt.to_csv(ROOT / f"data/processed/model2_backtest_{tag}.csv", index=False)
-    print(summarize(bt).to_string())
-    nr = backtest(with_resid=False)
-    nr.to_csv(ROOT / f"data/processed/model2_backtest_{tag}_weather_only.csv", index=False)
-    print("\nWeather scenarios only (no Model 1 misses added):")
-    print(summarize(nr)[["origins", "model MAE (Bcf)", "inside 80% range (%)", "80% width (Bcf)"]].to_string())
+    print(summarize(bt[bt.origin >= VAL_START]).to_string())

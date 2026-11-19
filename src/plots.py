@@ -37,7 +37,7 @@ def model1_holdout(tag="v3_own"):
     plt.close()
 
 
-def model2_fans(tag="v2", targets=(("2025-03-28", "Winter 2024–25"), ("2025-10-31", "Summer 2025"))):
+def model2_fans(tag="v2b_from2016", targets=(("2025-03-28", "Winter 2024–25"), ("2025-10-31", "Summer 2025"))):
     b = pd.read_csv(ROOT / f"data/processed/model2_backtest_{tag}.csv", parse_dates=["origin", "target"])
     fig, axs = plt.subplots(1, 2, figsize=(11.5, 4.6))
     for ax, (T, label) in zip(axs, targets):

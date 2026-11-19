@@ -84,7 +84,7 @@ A null result on Model 3 gets reported the same way, as a finding.
 Rows dated 2026-11-17 used development inputs cached in the HughFOD/gas-storage-nowcast repo. Rows dated 2026-11-18 use our own pulls: storage from the EIA bulk file (identical to the cached series in all 880 weeks), and degree days from Open-Meteo via `src/fetch.py` (correlation with the cached series 0.9997 for HDD and 0.998 for CDD over 1,142 weeks).
 
 ### Model 1 v2 (own data): block-bootstrap confidence intervals, holdout 2022+ (253 weeks)
-The loss differential is d_t = |benchmark miss| − |model miss|. Intervals use a moving block bootstrap with 8-week blocks and 10,000 resamples. Blocks of 1, 4, 13 and 26 weeks are in `reports/model1_bootstrap_v2_own.csv`, and the conclusions are unchanged across all of them.
+The loss differential is d_t = |benchmark miss| − |model miss|. Intervals use a moving block bootstrap with 8-week blocks and 10,000 resamples. Blocks of 1, 4, 13 and 26 weeks are in `reports/archive/model1_bootstrap_v2_own.csv`, and the conclusions are unchanged across all of them.
 
 | Comparison | Advantage (Bcf/week) | 95% CI | MAE ratio (95% CI) | Newey–West t |
 | --- | --- | --- | --- | --- |

@@ -1,2 +1,2 @@
-forecast_made_utc,week_ending,forecast_bcf,lo80_bcf,hi80_bcf,five_year_avg_bcf,hdd,cdd,weather_source,actual_bcf,miss_bcf
-2026-11-18 15:18,2026-11-13,7,-14,34,-25,99.5,16.9,forecast-api past_days,,
+forecast_made_utc,week_ending,forecast_change_bcf,lo80_change_bcf,hi80_change_bcf,five_year_avg_change_bcf,prior_week_level_bcf,forecast_level_bcf,hdd,cdd,weather_source,model,actual_change_bcf,miss_bcf,note
+2026-11-18 15:18,2026-11-13,7,-14,34,-25,3862,3869,99.5,16.9,forecast-api past_days,Model 1 v2 (ridge),,,"Made with v2, whose 5-year average drifted up to 6 days (fixed in v3 later the same day). Calendar-aligned 5-year average for this week is +27 Bcf, not -25. Forecast kept as logged."
