@@ -30,6 +30,12 @@ from pathlib import Path
 import pandas as pd
 
 RAW = Path(__file__).resolve().parents[1] / "data" / "raw"
+
+
+def historical_end():
+    """Latest end date the free historical licence allows. Databento treats roughly the
+    last day as live data, which needs a subscription, so stop two days back."""
+    return (pd.Timestamp.now(tz="UTC").normalize() - pd.Timedelta(days=2)).strftime("%Y-%m-%d")
 MONTH_CODES = "FGHJKMNQUVXZ"  # Jan..Dec
 OUTRIGHT = re.compile(r"^NG([FGHJKMNQUVXZ])(\d{1,2})$")
 QUERY = dict(dataset="GLBX.MDP3", symbols=["NG.FUT"], stype_in="parent")
@@ -37,7 +43,7 @@ QUERY = dict(dataset="GLBX.MDP3", symbols=["NG.FUT"], stype_in="parent")
 
 def cost(start="2010-06-06", end=None):
     import databento as db
-    end = end or pd.Timestamp.today().strftime("%Y-%m-%d")
+    end = end or historical_end()
     client = db.Historical(os.environ["DATABENTO_API_KEY"])
     for schema in ("statistics", "ohlcv-1d", "definition"):
         kw = dict(QUERY, schema=schema, start=start, end=end)
@@ -54,7 +60,7 @@ def contract_windows(first_year=2011, last_year=None):
     The single-digit CME year code is unambiguous inside each window.
     """
     last_year = last_year or pd.Timestamp.today().year + 1
-    today = pd.Timestamp.today().normalize()
+    today = pd.Timestamp(historical_end())
     out = []
     for y in range(first_year, last_year + 1):
         d = y % 10
@@ -130,9 +136,11 @@ def pull_full(start="2010-06-06", end=None, chunk=2_000_000):
     Output: data/raw/ng_curve_daily.csv (one row per contract per day).
     """
     import databento as db
-    end = end or pd.Timestamp.today().strftime("%Y-%m-%d")
+    end = end or historical_end()
     client = db.Historical(os.environ["DATABENTO_API_KEY"])
     dbn = RAW / "ng_statistics.dbn.zst"
+    if dbn.exists() and dbn.stat().st_size < 1_000_000:  # failed/partial download: start again
+        dbn.unlink()
     if not dbn.exists():  # resumable: the download is the slow, paid part
         print("Downloading to", dbn, "(several minutes)...")
         client.timeseries.get_range(**QUERY, schema="statistics", start=start, end=end, path=str(dbn))
