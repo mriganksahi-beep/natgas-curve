@@ -99,8 +99,7 @@ def pull_contracts(first_year=2011):
             print(f"{sym} {a}..{b}: no data")
             continue
         st = df[df["stat_type"] == db.StatType.SETTLEMENT_PRICE].copy()
-        st["date"] = (pd.to_datetime(st["ts_ref"]).dt.tz_convert("America/Chicago")
-                      .dt.normalize().dt.tz_localize(None))
+        st["date"] = pd.to_datetime(st["ts_ref"]).dt.tz_convert("UTC").dt.normalize().dt.tz_localize(None)
         st = st.sort_index().groupby("date", as_index=False).last()[["date", "price"]]
         st["symbol"], st["contract_year"], st["contract_month"] = sym, cy, cm
         frames.append(st.rename(columns={"price": "settle"}))
@@ -205,7 +204,9 @@ def pull_full(start="2010-06-06", end=None, chunk=2_000_000):
             df = df.assign(
                 field=df["stat_type"].map(keep),
                 value=df["price"].where(df["stat_type"] == db.StatType.SETTLEMENT_PRICE, df["quantity"]),
-                date=pd.to_datetime(df["ts_ref"]).dt.tz_convert("America/Chicago").dt.normalize().dt.tz_localize(None),
+                # ts_ref is 00:00 UTC on the trading date. (Converting it to Chicago time first
+                # put every row one day early; found by the EIA cross-check, see protocol.)
+                date=pd.to_datetime(df["ts_ref"]).dt.tz_convert("UTC").dt.normalize().dt.tz_localize(None),
             )
             parts.append(df.reset_index()[["ts_recv", "date", "instrument_id", "symbol", "field", "value"]])
         print(f"  {f.name}: processed {n:,} records so far")
@@ -215,7 +216,7 @@ def pull_full(start="2010-06-06", end=None, chunk=2_000_000):
     wide = last.pivot_table(index=["date", "instrument_id", "symbol"], columns="field",
                             values="value", aggfunc="last").reset_index()
     wide = assign_contract_years(wide)
-    cols = ["date", "symbol", "contract_year", "contract_month", "settle", "volume", "open_interest"]
+    wide.loc[wide["settle"] <= 0, "settle"] = float("nan")  # far-dated placeholders published as 0 = ["date", "symbol", "contract_year", "contract_month", "settle", "volume", "open_interest"]
     wide = wide[[c for c in cols if c in wide.columns]].sort_values(["contract_year", "contract_month", "date"])
     wide.to_csv(RAW / "ng_curve_daily.csv", index=False)
     print(f"Saved {len(wide):,} contract-days, {wide.groupby(['contract_year', 'contract_month']).ngroups} "
@@ -255,6 +256,40 @@ def assign_contract_years(wide: pd.DataFrame) -> pd.DataFrame:
     wide["contract_year"] = wide["instrument_id"].map(years)
     wide["contract_month"] = wide["symbol"].map(lambda s: MONTH_CODES.index(OUTRIGHT.match(s).group(1)) + 1)
     return wide
+
+
+def fix_first_pull(path=RAW / "ng_curve_daily.csv"):
+    """One-off repair of the 2026-11-20 pull, made before the date fix above:
+    shift dates +1 day to the true trading date and blank out zero settlements."""
+    c = pd.read_csv(path, parse_dates=["date"])
+    if c["date"].dt.dayofweek.eq(6).any():  # Sundays present -> not yet repaired
+        c["date"] = c["date"] + pd.Timedelta(days=1)
+    c.loc[c["settle"] <= 0, "settle"] = float("nan")
+    c.to_csv(path, index=False)
+    s = c.dropna(subset=["settle"])
+    s[["date", "symbol", "contract_year", "contract_month", "settle"]].to_csv(RAW / "ng_settlements.csv", index=False)
+    return c
+
+
+def check_against_eia(curve: pd.DataFrame) -> pd.DataFrame:
+    """Every day EIA published (to Apr 2024): contracts 1-4 should equal our 1st-4th
+    nearest contracts with a settlement that day."""
+    eia = pd.read_csv(RAW / "eia_futures_c1_c4.csv", parse_dates=["date"]).set_index("date")
+    c = curve.dropna(subset=["settle"]).copy()
+    c["ym"] = c.contract_year * 12 + c.contract_month
+    c = c[c.ym >= c.date.dt.year * 12 + c.date.dt.month]  # current or later delivery month
+    c = c.sort_values(["date", "ym"])
+    c["rank"] = c.groupby("date").cumcount() + 1
+    ours = c[c["rank"] <= 4].pivot(index="date", columns="rank", values="settle")
+    ours.columns = [f"c{k}" for k in ours.columns]
+    j = eia.join(ours, rsuffix="_db", how="inner")
+    rows = {}
+    for k in range(1, 5):
+        d = (j[f"c{k}_db"] - j[f"c{k}"]).abs().dropna()
+        rows[f"c{k}"] = {"days": len(d), "exact (%)": 100 * (d <= 0.0005).mean(), "max |diff|": d.max()}
+    out = pd.DataFrame(rows).T
+    print(out.round(4).to_string())
+    return j
 
 
 def spread_panel(settles: pd.DataFrame, near_month=3, far_month=4) -> pd.DataFrame:

@@ -201,3 +201,11 @@ A null result is reported the same way. With about 70 holdout observations, only
 ### Secondary target (reported separately, same procedure)
 - The October–January spread (V–F), in delivery-year pairs.
 - Inputs: Model 2's end-October forecast from summer origins (April–September).
+
+### Model 3 price data: pulled and validated (2026-11-20, before any modelling)
+- **Pull:** Databento batch job of CME Henry Hub statistics. The reduced file has 570,256 contract-days across 354 outright contracts, 3 Jun 2010 to 17 Nov 2026, with settlement prices plus volume and open interest (from Nov 2015). The file is licensed and kept out of the repo.
+- **Bug found by the EIA check, then fixed.** Converting Databento's `ts_ref` (00:00 UTC on the trading date) to Chicago time moved every row one day early: Mondays showed as Sundays and there were no Fridays. Fixed in `src/prices.py`, and the first pull was repaired with a +1 day shift.
+- **Validation:** on every day EIA published contracts 1–4 (3,464 days, Jun 2010 – Apr 2024), our nearest four contracts match EIA within its rounding on 99.97% of days. The single exception, 24 Nov 2010, is an expiry day where EIA still lists the expiring contract.
+- **Zero prices:** settlements of 0.000 on far-dated contracts are placeholders and are treated as missing.
+- **Primary spread:** March minus April, Nov–Feb. Typically $0.20–0.40/MMBtu, with spikes above $1 in cold winters (2014, Nov 2018, 2022, 2023).
+- **Liquidity:** median daily volume Nov–Feb is about 78k contracts for March and 52k for April; open interest is 229k and 124k.
