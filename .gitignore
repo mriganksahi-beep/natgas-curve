@@ -6,3 +6,7 @@ __pycache__/
 reports/run_v*.txt
 data/raw/weekly_degree_days.csv
 data/raw/weather_cache/
+
+# CME data via Databento: licensed, not for redistribution
+data/raw/ng_*.csv
+data/raw/*.dbn.zst

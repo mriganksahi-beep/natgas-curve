@@ -9,6 +9,12 @@ Use (Colab):
     export DATABENTO_API_KEY=...
     python -m src.prices cost        # price of the targeted pull; downloads nothing
     python -m src.prices pull        # downloads only the contracts Model 3 needs, saves CSV
+    python -m src.prices cost-full-feed / pull-full
+                                     # whole NG curve: settlement, volume, open interest for every
+                                     # outright contract, streamed to disk (~9 GB raw, compact output)
+
+Licence: CME/Databento data may not be redistributed. The downloaded files are git-ignored;
+only derived results (model scores, charts) go in the public repo.
 
 Why targeted: the whole NG parent feed (`NG.FUT`) in the statistics schema is ~9 GB
 (thousands of exchange-listed spreads and intraday statistic updates). Model 3 needs only
@@ -116,26 +122,83 @@ def contract_from_symbol(sym: str, trade_date: pd.Timestamp):
     return year, month
 
 
-def pull(start="2010-06-06", end=None):
+def pull_full(start="2010-06-06", end=None, chunk=2_000_000):
+    """Full NG feed, streamed to disk and reduced chunk by chunk (fits in Colab's memory).
+
+    Keeps, for every OUTRIGHT contract and trading day: settlement price, cleared volume
+    and open interest. Exchange-listed spreads and intraday updates are discarded.
+    Output: data/raw/ng_curve_daily.csv (one row per contract per day).
+    """
     import databento as db
     end = end or pd.Timestamp.today().strftime("%Y-%m-%d")
     client = db.Historical(os.environ["DATABENTO_API_KEY"])
-    data = client.timeseries.get_range(**QUERY, schema="statistics", start=start, end=end)
-    df = data.to_df(map_symbols=True)
-    settle = df[df["stat_type"] == db.StatType.SETTLEMENT_PRICE].copy()
-    # ts_ref is the trading session the settlement belongs to
-    settle["date"] = pd.to_datetime(settle["ts_ref"]).dt.tz_convert("America/Chicago").dt.normalize().dt.tz_localize(None)
-    settle = settle[settle["symbol"].str.match(OUTRIGHT)]  # drop exchange-listed spreads
-    parsed = [contract_from_symbol(s, d) for s, d in zip(settle["symbol"], settle["date"])]
-    settle["contract_year"] = [p[0] for p in parsed]
-    settle["contract_month"] = [p[1] for p in parsed]
-    out = (settle.sort_index()
-           .groupby(["date", "symbol"], as_index=False).last()  # final settlement per session
-           [["date", "symbol", "contract_year", "contract_month", "price"]]
-           .rename(columns={"price": "settle"}))
-    out.to_csv(RAW / "ng_settlements.csv", index=False)
-    print(out.groupby(out.date.dt.year).size().rename("rows per year").to_string())
-    return out
+    dbn = RAW / "ng_statistics.dbn.zst"
+    if not dbn.exists():  # resumable: the download is the slow, paid part
+        print("Downloading to", dbn, "(several minutes)...")
+        client.timeseries.get_range(**QUERY, schema="statistics", start=start, end=end, path=str(dbn))
+    store = db.DBNStore.from_file(str(dbn))
+    keep = {db.StatType.SETTLEMENT_PRICE: "settle", db.StatType.CLEARED_VOLUME: "volume",
+            db.StatType.OPEN_INTEREST: "open_interest"}
+    parts, n = [], 0
+    for df in store.to_df(count=chunk, map_symbols=True):
+        n += len(df)
+        df = df[df["stat_type"].isin(list(keep)) & df["symbol"].str.match(OUTRIGHT)]
+        if df.empty:
+            continue
+        df = df.assign(
+            field=df["stat_type"].map(keep),
+            value=df["price"].where(df["stat_type"] == db.StatType.SETTLEMENT_PRICE, df["quantity"]),
+            date=pd.to_datetime(df["ts_ref"]).dt.tz_convert("America/Chicago").dt.normalize().dt.tz_localize(None),
+        )
+        parts.append(df.reset_index()[["ts_recv", "date", "instrument_id", "symbol", "field", "value"]])
+        print(f"  processed {n:,} records")
+    long = pd.concat(parts).sort_values("ts_recv")
+    # last published value of each field per contract per session (settlements can be revised)
+    last = long.groupby(["date", "instrument_id", "symbol", "field"], as_index=False)["value"].last()
+    wide = last.pivot_table(index=["date", "instrument_id", "symbol"], columns="field",
+                            values="value", aggfunc="last").reset_index()
+    wide = assign_contract_years(wide)
+    cols = ["date", "symbol", "contract_year", "contract_month", "settle", "volume", "open_interest"]
+    wide = wide[[c for c in cols if c in wide.columns]].sort_values(["contract_year", "contract_month", "date"])
+    wide.to_csv(RAW / "ng_curve_daily.csv", index=False)
+    print(f"Saved {len(wide):,} contract-days, {wide.groupby(['contract_year', 'contract_month']).ngroups} "
+          f"contracts, {wide.date.min().date()}..{wide.date.max().date()}")
+    # the Model 3 subset, in the same format as pull_contracts
+    s = wide.dropna(subset=["settle"])
+    s[["date", "symbol", "contract_year", "contract_month", "settle"]].to_csv(RAW / "ng_settlements.csv", index=False)
+    return wide
+
+
+def assign_contract_years(wide: pd.DataFrame) -> pd.DataFrame:
+    """Resolve CME's one-digit year code per instrument.
+
+    A contract for month m of year Y stops trading in month m-1 (December of Y-1 for
+    January). For an instrument that expired inside the data, Y follows from its last
+    trading day. For one still trading, use the first year on or after its last day whose
+    final digit matches the code.
+    """
+    g = wide.groupby("instrument_id").agg(symbol=("symbol", "first"), last=("date", "max"))
+    data_end = wide["date"].max()
+    years = {}
+    for iid, r in g.iterrows():
+        m = OUTRIGHT.match(r.symbol)
+        month = MONTH_CODES.index(m.group(1)) + 1
+        digits = m.group(2)
+        if len(digits) == 2:
+            years[iid] = 2000 + int(digits)
+            continue
+        if r["last"] < data_end - pd.Timedelta(days=5):  # expired inside the data
+            y = r["last"].year + (1 if month == 1 else 0)
+        else:
+            y = r["last"].year - r["last"].year % 10 + int(digits)
+            if (y, month) < (r["last"].year, r["last"].month):
+                y += 10
+        if y % 10 != int(digits):
+            raise ValueError(f"year code mismatch for {r.symbol} (instrument {iid})")
+        years[iid] = y
+    wide["contract_year"] = wide["instrument_id"].map(years)
+    wide["contract_month"] = wide["symbol"].map(lambda s: MONTH_CODES.index(OUTRIGHT.match(s).group(1)) + 1)
+    return wide
 
 
 def spread_panel(settles: pd.DataFrame, near_month=3, far_month=4) -> pd.DataFrame:
@@ -178,3 +241,6 @@ if __name__ == "__main__":
     elif cmd == "pull":
         out = pull_contracts()
         cross_check_with_eia(out)
+    elif cmd == "pull-full":
+        wide = pull_full()
+        cross_check_with_eia(wide.dropna(subset=["settle"]))
