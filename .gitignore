@@ -10,3 +10,5 @@ data/raw/weather_cache/
 # CME data via Databento: licensed, not for redistribution
 data/raw/ng_*.csv
 data/raw/*.dbn.zst
+data/raw/ng_statistics_batch
+data/raw/ng_statistics_batch/

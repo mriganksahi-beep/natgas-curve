@@ -11,7 +11,7 @@ Use (Colab):
     python -m src.prices pull        # downloads only the contracts Model 3 needs, saves CSV
     python -m src.prices cost-full-feed / pull-full
                                      # whole NG curve: settlement, volume, open interest for every
-                                     # outright contract, streamed to disk (~9 GB raw, compact output)
+                                     # outright contract, via a Databento batch job (~9 GB raw, compact output)
 
 Licence: CME/Databento data may not be redistributed. The downloaded files are git-ignored;
 only derived results (model scores, charts) go in the public repo.
@@ -128,38 +128,68 @@ def contract_from_symbol(sym: str, trade_date: pd.Timestamp):
     return year, month
 
 
-def pull_full(start="2010-06-06", end=None, chunk=2_000_000):
-    """Full NG feed, streamed to disk and reduced chunk by chunk (fits in Colab's memory).
+BATCH_DIR = RAW / "ng_statistics_batch"
 
-    Keeps, for every OUTRIGHT contract and trading day: settlement price, cleared volume
-    and open interest. Exchange-listed spreads and intraday updates are discarded.
+
+def _batch_files(client, start, end, out_dir: Path):
+    """Get the full NG statistics feed as a Databento batch job (recommended over
+    streaming above 5 GB). Resumable: the job id is saved, finished files are reused."""
+    import time
+    out_dir = Path(os.path.realpath(out_dir))  # follow a link to Google Drive if there is one
+    out_dir.mkdir(parents=True, exist_ok=True)
+    files = sorted(out_dir.rglob("*.dbn.zst"))
+    if files:
+        print(f"Using {len(files)} files already downloaded in {out_dir}")
+        return files
+    id_file = out_dir / "job_id.txt"
+    if id_file.exists():
+        job_id = id_file.read_text().strip()
+        print("Resuming batch job", job_id)
+    else:
+        job = client.batch.submit_job(**QUERY, schema="statistics", start=start, end=end,
+                                      encoding="dbn", compression="zstd", split_duration="month")
+        job_id = job["id"]
+        id_file.write_text(job_id)
+        print("Submitted batch job", job_id, "- Databento prepares the files; this can take a while")
+    while True:
+        state = next((j["state"] for j in client.batch.list_jobs(since="2026-01-01") if j["id"] == job_id), "unknown")
+        print(f"  job state: {state}")
+        if state == "done":
+            break
+        if state in ("expired", "unknown"):
+            raise RuntimeError(f"Batch job {job_id} is {state}; delete {id_file} to resubmit")
+        time.sleep(60)
+    client.batch.download(job_id=job_id, output_dir=out_dir)
+    return sorted(out_dir.rglob("*.dbn.zst"))
+
+
+def pull_full(start="2010-06-06", end=None, chunk=2_000_000):
+    """Full NG curve: for every OUTRIGHT contract and trading day, the settlement price,
+    cleared volume and open interest. Exchange-listed spreads and intraday updates are
+    discarded. Files are read chunk by chunk, so memory use stays small.
     Output: data/raw/ng_curve_daily.csv (one row per contract per day).
     """
     import databento as db
     end = end or historical_end()
     client = db.Historical(os.environ["DATABENTO_API_KEY"])
-    dbn = RAW / "ng_statistics.dbn.zst"
-    if dbn.exists() and dbn.stat().st_size < 1_000_000:  # failed/partial download: start again
-        dbn.unlink()
-    if not dbn.exists():  # resumable: the download is the slow, paid part
-        print("Downloading to", dbn, "(several minutes)...")
-        client.timeseries.get_range(**QUERY, schema="statistics", start=start, end=end, path=str(dbn))
-    store = db.DBNStore.from_file(str(dbn))
+    files = _batch_files(client, start, end, BATCH_DIR)
     keep = {db.StatType.SETTLEMENT_PRICE: "settle", db.StatType.CLEARED_VOLUME: "volume",
             db.StatType.OPEN_INTEREST: "open_interest"}
     parts, n = [], 0
-    for df in store.to_df(count=chunk, map_symbols=True):
-        n += len(df)
-        df = df[df["stat_type"].isin(list(keep)) & df["symbol"].str.match(OUTRIGHT)]
-        if df.empty:
-            continue
-        df = df.assign(
-            field=df["stat_type"].map(keep),
-            value=df["price"].where(df["stat_type"] == db.StatType.SETTLEMENT_PRICE, df["quantity"]),
-            date=pd.to_datetime(df["ts_ref"]).dt.tz_convert("America/Chicago").dt.normalize().dt.tz_localize(None),
-        )
-        parts.append(df.reset_index()[["ts_recv", "date", "instrument_id", "symbol", "field", "value"]])
-        print(f"  processed {n:,} records")
+    for f in files:
+        store = db.DBNStore.from_file(str(f))
+        for df in store.to_df(count=chunk, map_symbols=True):
+            n += len(df)
+            df = df[df["stat_type"].isin(list(keep)) & df["symbol"].astype(str).str.match(OUTRIGHT)]
+            if df.empty:
+                continue
+            df = df.assign(
+                field=df["stat_type"].map(keep),
+                value=df["price"].where(df["stat_type"] == db.StatType.SETTLEMENT_PRICE, df["quantity"]),
+                date=pd.to_datetime(df["ts_ref"]).dt.tz_convert("America/Chicago").dt.normalize().dt.tz_localize(None),
+            )
+            parts.append(df.reset_index()[["ts_recv", "date", "instrument_id", "symbol", "field", "value"]])
+        print(f"  {f.name}: processed {n:,} records so far")
     long = pd.concat(parts).sort_values("ts_recv")
     # last published value of each field per contract per session (settlements can be revised)
     last = long.groupby(["date", "instrument_id", "symbol", "field"], as_index=False)["value"].last()
@@ -171,8 +201,7 @@ def pull_full(start="2010-06-06", end=None, chunk=2_000_000):
     wide.to_csv(RAW / "ng_curve_daily.csv", index=False)
     print(f"Saved {len(wide):,} contract-days, {wide.groupby(['contract_year', 'contract_month']).ngroups} "
           f"contracts, {wide.date.min().date()}..{wide.date.max().date()}")
-    # the Model 3 subset, in the same format as pull_contracts
-    s = wide.dropna(subset=["settle"])
+    s = wide.dropna(subset=["settle"])  # the Model 3 subset, same format as pull_contracts
     s[["date", "symbol", "contract_year", "contract_month", "settle"]].to_csv(RAW / "ng_settlements.csv", index=False)
     return wide
 
