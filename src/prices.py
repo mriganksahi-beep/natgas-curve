@@ -151,15 +151,34 @@ def _batch_files(client, start, end, out_dir: Path):
         job_id = job["id"]
         id_file.write_text(job_id)
         print("Submitted batch job", job_id, "- Databento prepares the files; this can take a while")
+    failures = 0
     while True:
-        state = next((j["state"] for j in client.batch.list_jobs(since="2026-01-01") if j["id"] == job_id), "unknown")
+        try:  # Databento's status endpoint sometimes times out (504); the job keeps running
+            jobs = client.batch.list_jobs(since="2026-01-01")
+            failures = 0
+        except Exception as e:
+            failures += 1
+            print(f"  status check failed ({type(e).__name__}); retrying in 60s [{failures}/20]")
+            if failures >= 20:
+                raise
+            time.sleep(60)
+            continue
+        state = next((j["state"] for j in jobs if j["id"] == job_id), "unknown")
         print(f"  job state: {state}")
         if state == "done":
             break
         if state in ("expired", "unknown"):
             raise RuntimeError(f"Batch job {job_id} is {state}; delete {id_file} to resubmit")
         time.sleep(60)
-    client.batch.download(job_id=job_id, output_dir=out_dir)
+    for attempt in range(5):  # retry the download on network hiccups
+        try:
+            client.batch.download(job_id=job_id, output_dir=out_dir)
+            break
+        except Exception as e:
+            if attempt == 4:
+                raise
+            print(f"  download interrupted ({type(e).__name__}); retrying in 60s")
+            time.sleep(60)
     return sorted(out_dir.rglob("*.dbn.zst"))
 
 
