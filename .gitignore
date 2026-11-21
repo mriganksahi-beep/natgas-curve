@@ -12,3 +12,4 @@ data/raw/ng_*.csv
 data/raw/*.dbn.zst
 data/raw/ng_statistics_batch
 data/raw/ng_statistics_batch/
+data/processed/model3_*.csv

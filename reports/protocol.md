@@ -209,3 +209,26 @@ A null result is reported the same way. With about 70 holdout observations, only
 - **Zero prices:** settlements of 0.000 on far-dated contracts are placeholders and are treated as missing.
 - **Primary spread:** March minus April, Nov–Feb. Typically $0.20–0.40/MMBtu, with spikes above $1 in cold winters (2014, Nov 2018, 2022, 2023).
 - **Liquidity:** median daily volume Nov–Feb is about 78k contracts for March and 52k for April; open interest is 229k and 124k.
+
+### Model 3 step 1: weekly dataset (2026-11-21)
+- **One pre-results change to the timing.** Observations use the settlement on the first trading day on or after the **Friday** after each storage week, not the Thursday. EIA moves the report in some holiday weeks, sometimes to Friday. A Thursday settlement could then come before the report, while a Friday settlement always comes after it, since the report is out at 10:30 ET and settlement is at 14:30 ET. The change was made before any model was fitted.
+- **Rows:** 126 winter weeks.
+  - Validation: 70 rows, Nov 2016 – Dec 2021.
+  - Holdout: 56 rows, Jan 2022 – Jan 2026.
+  - That is 12–13 rows per winter, with the last at least 25 days before the March contract expires.
+- **New test file, `tests/test_model3_data.py`:**
+  - Model 2's forecast is unchanged when storage and weather after the origin are altered.
+  - Every row's settlement comes after its storage report.
+  - Targets fall 1 and 4 weeks later and before expiry.
+
+### Model 3 step 2: first look, validation rows only (holdout not examined)
+- **Correlation with the spread:**
+  - expected end-March surplus vs the 5-year average: −0.65
+  - pessimistic (10th-percentile) surplus: −0.76
+  - April price: +0.30
+  - weeks to expiry: +0.40
+- **The relationship is curved, as storage theory predicts.** The spread is flat near zero when surplus is above about −300 Bcf, and rises steeply below that. Winter 2018–19 makes up most of the steep part.
+- **Winter 2021–22 is above the curve.** It has spreads of $0.5–0.7 with near-normal expected storage, at high price levels. This supports the price-level input.
+- **Model 2's median sits below the 5-year average in most weeks** (mean −249 Bcf). That matches Model 2's known long-horizon bias. A constant offset is absorbed by the fair-value fit.
+
+Figure: `reports/figures/model3_first_look_validation.png`.
