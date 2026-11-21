@@ -232,3 +232,38 @@ A null result is reported the same way. With about 70 holdout observations, only
 - **Model 2's median sits below the 5-year average in most weeks** (mean −249 Bcf). That matches Model 2's known long-horizon bias. A constant offset is absorbed by the fair-value fit.
 
 Figure: `reports/figures/model3_first_look_validation.png`.
+
+### Model 3 steps 3–4: implementation choices, fixed before any holdout row was scored (2026-11-21)
+- **Walk-forward by winter.** A test winter needs two earlier winters, one to fit fair value and one to estimate b. Test winters are therefore 2018–19 onward, and 2016–17 and 2017–18 are training only.
+- **b**, the share of a gap expected to close over h weeks:
+  - estimated on leave-one-winter-out gaps from the earlier winters, so it is not inflated by in-sample residuals
+  - clipped to [0, 1]
+  - when b = 0, no trade is taken
+- **Settings for the spline, gradient boosting and the MLP were fixed defaults, not tuned.** The protocol planned a choice on validation winters. With 46 validation rows a grid search would mostly fit noise, so this deviates from the plan.
+  - Spline: 4 knots, ridge alpha 1.
+  - Gradient boosting: depth 2, 100 iterations, learning rate 0.05, minimum leaf 5.
+  - MLP: 2×16 layers, Adam with lr 0.01, weight decay 0.001, early stopping on the last training winter, averaged over 5 seeds.
+
+### Model 3 validation results (test winters 2018–19 to Dec 2021; 46 rows at h=1, 43 at h=4)
+Full table: `reports/model3_results_validation.csv`.
+
+| h | Method | OOS R² vs no change | DM p | Trades | $/trade @4 ticks | 95% CI (winter bootstrap) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | linear | 0.03 | 0.21 | 46 | 282 | −200 to 906 |
+| 1 | convex | 0.04 | 0.17 | 46 | 197 | 19 to 410 |
+| 1 | spline | 0.03 | 0.23 | 46 | 36 | −200 to 318 |
+| 1 | gbm | −0.10 | 0.64 | 46 | 173 | −6 to 387 |
+| 1 | mlp | 0.06 | 0.16 | 46 | 163 | 43 to 388 |
+| 4 | linear | 0.05 | 0.34 | 43 | 1,076 | −538 to 2,933 |
+| 4 | convex | 0.19 | 0.12 | 31 | 784 | −43 to 2,399 |
+| 4 | spline | 0.06 | 0.33 | 31 | 142 | −748 to 2,099 |
+| 4 | gbm | 0.63 | 0.04 | 43 | 1,249 | 137 to 2,528 |
+| 4 | mlp | 0.19 | 0.11 | 31 | 803 | 146 to 2,501 |
+
+**Reading:**
+- The R² and the P&L come almost entirely from two episodes.
+  - **Nov–Dec 2018:** the spread spiked to about $1.15, far above storage-based fair value (about $0.2–0.3), then fell back.
+  - **Dec 2021:** the spread was rich and declined.
+- In 2019–20 and 2020–21 the gaps were small and the forecasts added nothing.
+- Gradient boosting's h = 4 result (R² 0.63, p = 0.04) rests on 2018–19 alone, which supplies 0.43 of its 0.63. In that winter the convex, spline and MLP versions estimated b = 0 and did not trade.
+- Only gradient boosting at h = 4 clears p < 0.05. With 4 test winters, none of these intervals can rule out luck from a single episode.
