@@ -5,5 +5,3 @@ matplotlib
 requests
 xlrd
 pytest
-databento
-torch

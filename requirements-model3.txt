@@ -1,0 +1,4 @@
+# Extra packages for Model 3 (prices and the PyTorch model); not needed by the weekly job
+-r requirements.txt
+databento
+torch

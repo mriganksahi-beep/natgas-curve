@@ -45,7 +45,7 @@ The bot's commit time is the timestamp. Column meanings are in [`reports/README.
 
 ## Reproduce
 ```
-pip install -r requirements.txt
+pip install -r requirements.txt          # add requirements-model3.txt for Model 3
 python -c "from src.fetch import from_bulk; from_bulk('NG.txt')"      # EIA bulk file, no key
 python -c "from src.fetch import fetch_weather, weekly_degree_days; weekly_degree_days(fetch_weather())"
 python -m pytest tests          # no-look-ahead checks
