@@ -20,7 +20,12 @@ Everything here uses public data (EIA, Open-Meteo, and later CME settlements via
 - The 80% ranges are calibrated: they covered the actual 85–93% of the time from 2022.
 - The central forecast beats the 5-year-average path only within about 8 weeks of season end. Further out, weather is unforecastable and "normal" is as good a centre as any.
 
-**Model 3: storage view vs the March–April futures spread.** The design is pre-registered. It is waiting on contract-level price data.
+**Model 3 and Study v2: what the futures curve knows about storage.** Results from 2010–2021, then a single holdout run on 2022–2026 ([summary](reports/holdout/SUMMARY.md), [synthesis](reports/synthesis_v2.md)):
+- **Storage surprises measured against norms barely move the March–April spread** (holdout R² 0.02).
+- **The curve moves ahead of storage reports, mostly on weather** (holdout correlation −0.21 with the report two weeks out; about 70% of it is weather).
+- **The winter curve behaves as one factor.**
+- **No relative-value trading rule survives the holdout:** curve kinks, the gap between implied and forecast storage, and the storage-based fair value all fail.
+- **One narrow pattern recurs:** early-winter scarcity spikes that partly unwind (2018, 2021, 2022, 2026). It is now tracked live as a hypothesis. It carries real tail risk: the 2014 polar-vortex spike kept rising.
 
 ## Live record
 Every Wednesday at 12:00 UTC, before EIA's release, a [GitHub Action](.github/workflows/live_forecast.yml) does three things:

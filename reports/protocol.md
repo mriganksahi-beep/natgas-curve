@@ -267,3 +267,11 @@ Full table: `reports/model3_results_validation.csv`.
 - In 2019–20 and 2020–21 the gaps were small and the forecasts added nothing.
 - Gradient boosting's h = 4 result (R² 0.63, p = 0.04) rests on 2018–19 alone, which supplies 0.43 of its 0.63. In that winter the convex, spline and MLP versions estimated b = 0 and did not trade.
 - Only gradient boosting at h = 4 clears p < 0.05. With 4 test winters, none of these intervals can rule out luck from a single episode.
+
+## Holdout results (run once, 2026-11-21)
+See `reports/holdout/SUMMARY.md`.
+- **Failed:** H0, H1, H3 and H4.
+- **Passed, as expected:** H5a and H5b (storage surprises explain little; the curve leads the reports, mostly on weather).
+- **Passed on paper but resting on essentially one episode (Nov 2022):** H0b and H2.
+
+The descriptive findings replicate. No systematic trading rule survives. Early-winter scarcity spikes that partly unwind (2018, 2021, 2022, 2026) remain a declared hypothesis, to be tracked live.
