@@ -1,5 +1,11 @@
 # Brief for research agents (read fully before starting)
 
+> **Study v3 note:**
+> - Read `reports/study_v3.md` and `reports/synthesis_v2.md` (what we already know) and `reports/holdout/SUMMARY.md` (but use no 2022+ data yourself).
+> - **Cost convention:** k ticks per contract per side, so the round trip on one contract costs 2k ticks; 1 tick = $10/contract.
+> - **Model 2 cache:** winter scenario percentiles (p1–p99 of end-March storage, origins Nov 2016 – Dec 2021) are in `data/processed/shared/model2_winter_percentiles_dev.csv`, so you don't need to rerun the simulation for winter. Never open any other file that contains 2022+ origins.
+> - **Report extra section 8, "New avenues":** 2–4 concrete follow-ups your results suggest, each with one line of expected value.
+
 You are one of several parallel research agents on a natural gas research project. The repo is at `/home/claude/natgas-curve`. Read these first:
 - `reports/study_v2.md` (the study you serve)
 - `reports/protocol.md` (history, especially the Model 2 and Model 3 sections)
