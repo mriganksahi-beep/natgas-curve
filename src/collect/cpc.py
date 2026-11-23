@@ -59,10 +59,19 @@ def signed(cat: str, p: float) -> float:
 def one(date: pd.Timestamp, product: str):
     import shapefile
     from shapely.geometry import Point, shape
-    blob = get(f"{BASE}/{product}temp_{date:%Y%m%d}.zip")
-    if blob is None:
+    zf = None
+    for attempt in range(4):
+        blob = get(f"{BASE}/{product}temp_{date:%Y%m%d}.zip")
+        if blob is None:
+            return []
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(blob))
+            break
+        except zipfile.BadZipFile:
+            time.sleep(10 * (attempt + 1))
+    if zf is None:
+        print(f"bad zip after retries: {product} {date:%Y-%m-%d}", flush=True)
         return []
-    zf = zipfile.ZipFile(io.BytesIO(blob))
     base = [n[:-4] for n in zf.namelist() if n.lower().endswith(".shp")][0]
     r = shapefile.Reader(shp=io.BytesIO(zf.read(base + ".shp")), dbf=io.BytesIO(zf.read(base + ".dbf")))
     fields = [f[0] for f in r.fields[1:]]
@@ -94,7 +103,7 @@ def collect(start, end, tag):
     out = OUT / f"cpc_outlooks_{tag}.csv"
     jobs = [(d, p) for d in pd.date_range(start, end) for p in ("610", "814")]
     rows, t0 = [], time.time()
-    with cf.ThreadPoolExecutor(8) as ex:
+    with cf.ThreadPoolExecutor(4) as ex:
         for k, res in enumerate(ex.map(lambda a: one(*a), jobs)):
             rows.extend(res)
             if (k + 1) % 200 == 0:
