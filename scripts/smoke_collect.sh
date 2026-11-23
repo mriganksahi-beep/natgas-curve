@@ -1,10 +1,7 @@
-set -e
-pip -q install pandas numpy requests pygrib
-nproc
-python - <<'PY'
-import pandas as pd, time
-from pathlib import Path
-from src.collect import gefs
-t=time.time(); gefs.collect(list(pd.date_range("2005-01-03","2005-01-14")), "reforecast", Path("/tmp/t.csv"))
-print("12 reforecast runs", f"{time.time()-t:.0f}s"); print(pd.read_csv("/tmp/t.csv").head(3).to_string())
-PY
+set +e
+S="aws s3 ls --no-sign-request"
+$S s3://noaa-gefs-retrospective/GEFSv12/reforecast/2000/2000010500/c00/
+$S s3://noaa-gefs-retrospective/GEFSv12/reforecast/2000/2000010500/
+$S "s3://noaa-gefs-retrospective/GEFSv12/reforecast/2000/2000010500/c00/Days:10-35/" | grep tmp_2m
+$S "s3://noaa-gefs-retrospective/GEFSv12/reforecast/2015/2015011400/p04/" 
+curl -s "https://noaa-gefs-retrospective.s3.amazonaws.com/GEFSv12/reforecast/2000/2000010500/c00/Days%3A10-35/tmp_2m_2000010500_c00.grib2.idx" | head -4

@@ -18,3 +18,5 @@ data/processed/shared/
 
 # CME options via Databento: licensed, not for redistribution
 data/raw/options/
+data/processed/v4/
+data/processed/v4_locked/
