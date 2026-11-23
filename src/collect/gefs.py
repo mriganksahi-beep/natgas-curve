@@ -241,7 +241,13 @@ if __name__ == "__main__":
     src = sys.argv[1]
     if src == "reforecast":
         y = int(sys.argv[2])
-        collect(winter_days(y), "reforecast", OUT / f"reforecast_ens5_{y}.csv")
+        half = sys.argv[3] if len(sys.argv) > 3 else ""
+        days = winter_days(y)
+        if half == "a":
+            days = [d for d in days if d.month <= 4]
+        elif half == "b":
+            days = [d for d in days if d.month >= 10]
+        collect(days, "reforecast", OUT / f"reforecast_ens5_{y}{half}.csv")
     else:
         a, b = sys.argv[2], sys.argv[3]
         days = [x for x in pd.date_range(a, b, freq="D")]
