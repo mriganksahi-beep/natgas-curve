@@ -59,7 +59,9 @@ def yahoo_closes(contracts, start="2026-04-01") -> pd.DataFrame:
     for y, m in contracts:
         for attempt in range(4):
             try:
-                d = yf.download(ticker(y, m), start=start, progress=False, auto_adjust=False)
+                d = yf.download(ticker(y, m), start=start, progress=False, auto_adjust=False,
+                                timeout=30, threads=False)
+                print(f"{ticker(y, m)}: {len(d)} rows", flush=True)
                 break
             except Exception as e:  # network hiccup
                 if attempt == 3:
@@ -121,13 +123,14 @@ def daily_temps(start: str) -> pd.DataFrame:
                 except requests.RequestException as e:
                     if attempt == 3:
                         raise
-                    print(f"{city}: {e}; retry")
+                    print(f"{city}: {e}; retry", flush=True)
                     time.sleep(30 * (attempt + 1))
             d = r.json()["daily"]
             got.append(pd.Series(d["temperature_2m_mean"], index=pd.to_datetime(d["time"]), dtype=float))
         s = got[0].combine_first(got[1])  # archive first
         s = s[s.index <= end]
         frames.append(pd.DataFrame({"date": s.index, "city": city, "temp_f": s.values}))
+        print(f"weather {city}: {s.notna().sum()} days", flush=True)
         time.sleep(1)
     return pd.concat(frames)
 

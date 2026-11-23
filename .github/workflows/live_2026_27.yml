@@ -18,7 +18,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt yfinance
-      - run: python -m src.live2627
+      - run: python -u -m src.live2627
+        timeout-minutes: 25
       - name: Commit results
         run: |
           git config user.name "live-forecast-bot"
