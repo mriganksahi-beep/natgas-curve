@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       what:
-        description: "all | gefs_reforecast | gefs_operational | cpc | other"
+        description: "all | gefs_reforecast | gefs_wed | gefs_operational | cpc | other"
         default: all
 
 permissions:
@@ -30,6 +30,24 @@ jobs:
       - run: python -m src.collect.gefs reforecast ${{ matrix.year }} ${{ matrix.half }}
       - uses: actions/upload-artifact@v4
         with: {name: "gefs_rf_${{ matrix.year }}${{ matrix.half }}", path: data/forecasts/gefs/}
+
+  gefs_wed:
+    if: inputs.what == 'gefs_wed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        year: [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
+               2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - run: pip install pandas numpy requests pygrib
+      - run: python -m src.collect.gefs reforecast ${{ matrix.year }} w
+      - uses: actions/upload-artifact@v4
+        with: {name: "gefs_rf_${{ matrix.year }}w", path: data/forecasts/gefs/}
 
   gefs_operational:
     if: inputs.what == 'all' || inputs.what == 'gefs_operational'
@@ -93,7 +111,7 @@ jobs:
         with: {name: "other", path: "data/raw/eia/\ndata/weather/"}
 
   commit:
-    needs: [gefs_reforecast, gefs_operational, cpc, other]
+    needs: [gefs_reforecast, gefs_wed, gefs_operational, cpc, other]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -114,7 +132,9 @@ jobs:
               parts = [pd.read_csv(f) for f in fs]
               if os.path.exists(out):  # accumulate across runs
                   parts.insert(0, pd.read_csv(out))
-              df = pd.concat(parts).drop_duplicates()
+              df = pd.concat(parts)
+              keys = [c for c in ("init_date", "valid_et_date", "lead_days", "issue_date", "product", "city") if c in df.columns]
+              df = df.drop_duplicates(subset=keys, keep="last")  # later collections win
               df.to_csv(out, index=False, compression="gzip")
               print(out, len(df), "rows from", len(fs), "files")
           merge("artifacts/gefs_rf_*/**/reforecast_ens5_*.csv", "data/forecasts/gefs_reforecast_ens5.csv.gz")

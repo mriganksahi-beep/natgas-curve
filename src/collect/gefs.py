@@ -129,8 +129,11 @@ def plan(init: pd.Timestamp, source: str, mem: str):
     ymdh = init.strftime("%Y%m%d") + "00"
     if source == "reforecast":
         base = f"{RF}/{init.year}/{ymdh}/{mem}"
+        late = {h for h in hours if h > 240}
         return [(f"{base}/Days%3A1-10/tmp_2m_{ymdh}_{mem}.grib2", {h for h in hours if h <= 240}),
-                (f"{base}/Days%3A10-16/tmp_2m_{ymdh}_{mem}.grib2", {h for h in hours if h > 240})]
+                (f"{base}/Days%3A10-16/tmp_2m_{ymdh}_{mem}.grib2", late),
+                # Wednesdays: the weekly 35-day reforecast keeps days 10+ in Days:10-35
+                (f"{base}/Days%3A10-35/tmp_2m_{ymdh}_{mem}.grib2", late)]
     day = init.strftime("%Y%m%d")
     pre = "gec00" if mem == "c00" else "gep" + mem[1:]
     if init >= pd.Timestamp("2020-09-23"):
@@ -247,6 +250,8 @@ if __name__ == "__main__":
             days = [d for d in days if d.month <= 4]
         elif half == "b":
             days = [d for d in days if d.month >= 10]
+        elif half == "w":  # Wednesdays only (re-collection with the Days:10-35 files)
+            days = [d for d in days if d.dayofweek == 2]
         collect(days, "reforecast", OUT / f"reforecast_ens5_{y}{half}.csv")
     else:
         a, b = sys.argv[2], sys.argv[3]
