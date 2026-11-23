@@ -5,7 +5,7 @@ These rules are fixed. The code is `src/live2627.py`, and its frozen parameters 
 **Why live.** The 2022–26 holdout has been used twice: once in study v2, and again in v3, whose thesis was formed with those years in view. Live data is the only sample that no part of the research has seen.
 
 **Data.**
-- **Prices:** Yahoo Finance daily closes of individual NYMEX contracts (`NGH27.NYM` etc.). Yahoo is free and redistributable, and no licensed CME data is stored here. Yahoo closes were checked against CME settles for overlapping November dates (see the change log). Any gap larger than one tick is reported.
+- **Prices:** Yahoo Finance daily closes of individual NYMEX contracts (`NGH27.NYM` etc.). Yahoo is free and redistributable, and no licensed CME data is stored here. On 23 Nov 2026, Yahoo closes were checked against CME settlements (via Databento) for 3–17 Nov 2026, 11 days and 6 contracts. They matched exactly, with a maximum absolute difference of $0.000.
 - **Weather:** the Open-Meteo archive, topped up with Open-Meteo's analysis for the latest days, for the same 17 cities and gas weights as Model 1.
 
 ## L1: March−April 2027 premium path
@@ -43,4 +43,4 @@ These rules are fixed. The code is `src/live2627.py`, and its frozen parameters 
 NOAA keeps permanent public archives of the CPC 6–10 and 8–14-day outlooks and the GEFS forecasts, so this winter's forecasts can be collected at any time and need no daily snapshot. Any v4 live rule will be frozen in a dated amendment below **before** it is scored. Only weeks after that freeze date count as live evidence.
 
 ## Change log
-- 2026-11-23: protocol frozen.
+- 2026-11-23: protocol frozen. First run committed (L1 from both entries; L2 with 1 week scored). Yahoo = CME settle check passed (see Data).

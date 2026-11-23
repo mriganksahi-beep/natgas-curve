@@ -104,7 +104,7 @@ def widowmaker_path(px: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 def daily_temps(start: str) -> pd.DataFrame:
     """Realised daily mean temps (F): Open-Meteo archive, topped up with the forecast API's
     past days for the most recent dates the archive does not have yet."""
-    end = (pd.Timestamp.utcnow().tz_localize(None) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    end = (pd.Timestamp.now("UTC").tz_localize(None) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
     frames = []
     for city, (lat, lon, _, _) in CITIES.items():
         got = []
@@ -201,7 +201,7 @@ def main():
     anom = hdd_anomaly(weekly_hdd(daily))
     ws, s2 = weather_skill(px, anom)
     ws.to_csv(OUT / "L2_weather_skill.csv", index=False)
-    stamp = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    stamp = pd.Timestamp.now("UTC").strftime("%Y-%m-%d %H:%M UTC")
     (OUT / "status.json").write_text(json.dumps({"updated": stamp, "L1": s1, "L2": s2}, indent=1))
     print(json.dumps({"L1": s1, "L2": s2}, indent=1))
 
