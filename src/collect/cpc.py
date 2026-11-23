@@ -31,7 +31,9 @@ def get(url, tries=5):
     for k in range(tries):
         try:
             r = requests.get(url, timeout=60)
-            if r.status_code == 404:
+            if r.status_code in (403, 404):  # NOAA denies a few archive files: treat as missing
+                if r.status_code == 403:
+                    print(f"403 (skipped): {url}", flush=True)
                 return None
             r.raise_for_status()
             return r.content
