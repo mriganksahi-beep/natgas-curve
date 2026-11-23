@@ -1,0 +1,28 @@
+{
+ "updated": "2026-11-23 06:53 UTC",
+ "L1": {
+  "may": {
+   "entry": "2026-05-22",
+   "spread_at_entry": 0.209,
+   "last_date": "2026-11-23",
+   "spread_last": 0.038,
+   "pnl_last": 1550,
+   "worst_pnl": -660,
+   "worst_drawdown": -510,
+   "expired": false
+  },
+  "nov": {
+   "entry": "2026-11-06",
+   "spread_at_entry": 0.052,
+   "last_date": "2026-11-23",
+   "spread_last": 0.038,
+   "pnl_last": -20,
+   "worst_pnl": -280,
+   "worst_drawdown": -120,
+   "expired": false
+  }
+ },
+ "L2": {
+  "weeks_scored": 1
+ }
+}
