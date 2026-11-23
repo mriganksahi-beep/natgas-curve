@@ -113,8 +113,8 @@ jobs:
               df = pd.concat(pd.read_csv(f) for f in fs).drop_duplicates()
               df.to_csv(out, index=False, compression="gzip")
               print(out, len(df), "rows from", len(fs), "files")
-          merge("artifacts/gefs_rf_*/**/reforecast_c00_*.csv", "data/forecasts/gefs_reforecast_c00.csv.gz")
-          merge("artifacts/gefs_op_*/**/operational_c00_*.csv", "data/forecasts/gefs_operational_c00.csv.gz")
+          merge("artifacts/gefs_rf_*/**/reforecast_ens5_*.csv", "data/forecasts/gefs_reforecast_ens5.csv.gz")
+          merge("artifacts/gefs_op_*/**/operational_ens5_*.csv", "data/forecasts/gefs_operational_ens5.csv.gz")
           merge("artifacts/cpc_*/**/cpc_outlooks_*.csv", "data/forecasts/cpc_outlooks.csv.gz")
           if os.path.isdir("artifacts/other"):
               for root, _, files in os.walk("artifacts/other"):

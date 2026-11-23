@@ -116,26 +116,30 @@ def fetch_messages(file_url: str, want_hours: set[int]):
     return got
 
 
-def run_values(init: pd.Timestamp, source: str):
-    """-> DataFrame(hour, city, temp_k) for one 00Z control run, or None if missing."""
+MEMBERS = ("c00", "p01", "p02", "p03", "p04")  # the reforecast has 5 daily members
+
+
+def run_values(init: pd.Timestamp, source: str, mem: str = "c00"):
+    """-> DataFrame(hour, city, temp_k) for one 00Z run of member `mem`, or None if missing."""
     hours = set(range(6, MAX_LEAD_H + 1, 6))
     blobs = {}
     ymdh = init.strftime("%Y%m%d") + "00"
     if source == "reforecast":
-        base = f"{RF}/{init.year}/{ymdh}/c00"
+        base = f"{RF}/{init.year}/{ymdh}/{mem}"
         for part in ("Days%3A1-10", "Days%3A10-16"):
-            got = fetch_messages(f"{base}/{part}/tmp_2m_{ymdh}_c00.grib2", hours - set(blobs))
+            got = fetch_messages(f"{base}/{part}/tmp_2m_{ymdh}_{mem}.grib2", hours - set(blobs))
             blobs.update(got)
     else:
         day = init.strftime("%Y%m%d")
+        pre = "gec00" if mem == "c00" else "gep" + mem[1:]
         if init >= pd.Timestamp("2020-09-23"):
             def url(h):
-                return (f"{OP}/gefs.{day}/00/atmos/pgrb2sp25/gec00.t00z.pgrb2s.0p25.f{h:03d}" if h <= 240
-                        else f"{OP}/gefs.{day}/00/atmos/pgrb2ap5/gec00.t00z.pgrb2a.0p50.f{h:03d}")
+                return (f"{OP}/gefs.{day}/00/atmos/pgrb2sp25/{pre}.t00z.pgrb2s.0p25.f{h:03d}" if h <= 240
+                        else f"{OP}/gefs.{day}/00/atmos/pgrb2ap5/{pre}.t00z.pgrb2a.0p50.f{h:03d}")
         else:  # GEFS v11: 1 degree, all variables in pgrb2a
             def url(h):
-                return f"{OP}/gefs.{day}/00/pgrb2a/gec00.t00z.pgrb2af{h:03d}" if h >= 100 else \
-                       f"{OP}/gefs.{day}/00/pgrb2a/gec00.t00z.pgrb2af{h:02d}"
+                return f"{OP}/gefs.{day}/00/pgrb2a/{pre}.t00z.pgrb2af{h:03d}" if h >= 100 else \
+                       f"{OP}/gefs.{day}/00/pgrb2a/{pre}.t00z.pgrb2af{h:02d}"
         with cf.ThreadPoolExecutor(8) as ex:
             futs = {ex.submit(fetch_messages, url(h), {h}): h for h in sorted(hours)}
             for fu in futs:
@@ -166,7 +170,7 @@ def daily_means(init: pd.Timestamp, v: pd.DataFrame) -> pd.DataFrame:
     return g[["init_date", "valid_et_date", "lead_days", "city", "temp_f"]]
 
 
-def collect(dates, source: str, out_file: Path, workers=6):
+def collect(dates, source: str, out_file: Path, workers=8):
     out_file.parent.mkdir(parents=True, exist_ok=True)
     done = set()
     if out_file.exists():
@@ -176,8 +180,18 @@ def collect(dates, source: str, out_file: Path, workers=6):
     t0 = time.time()
 
     def one(d):
-        v = run_values(d, source)
-        return d, (None if v is None else daily_means(d, v))
+        per = {}
+        for m in MEMBERS:
+            v = run_values(d, source, m)
+            if v is not None and len(v):
+                per[m] = daily_means(d, v).set_index(["init_date", "valid_et_date", "lead_days", "city"]).temp_f
+        if "c00" not in per:
+            return d, None
+        out = per["c00"].rename("temp_c00").to_frame()
+        ens = pd.concat(per.values(), axis=1)
+        out["temp_ens"] = ens.mean(axis=1).round(2)
+        out["n_mem"] = ens.notna().sum(axis=1)
+        return d, out.reset_index()
 
     frames, missing = [], []
     with cf.ThreadPoolExecutor(workers) as ex:
@@ -213,9 +227,9 @@ if __name__ == "__main__":
     src = sys.argv[1]
     if src == "reforecast":
         y = int(sys.argv[2])
-        collect(winter_days(y), "reforecast", OUT / f"reforecast_c00_{y}.csv")
+        collect(winter_days(y), "reforecast", OUT / f"reforecast_ens5_{y}.csv")
     else:
         a, b = sys.argv[2], sys.argv[3]
         days = [x for x in pd.date_range(a, b, freq="D")]
         tag = sys.argv[4] if len(sys.argv) > 4 else f"{a[:4]}"
-        collect(days, "operational", OUT / f"operational_c00_{tag}.csv")
+        collect(days, "operational", OUT / f"operational_ens5_{tag}.csv")

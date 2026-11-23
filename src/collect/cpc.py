@@ -46,6 +46,8 @@ def signed(cat: str, p: float) -> float:
     max(0, 33.3 - (p - 33.3)/2) (CPC convention: normal takes about half the excess)."""
     if cat in (None, "EC") or pd.isna(p):
         return 0.0
+    if p <= 33.4:  # weakest contour: barely tilted
+        return 0.0
     opp = max(0.0, 33.3 - (p - 33.3) / 2)
     if cat == "Above":
         return p - opp
