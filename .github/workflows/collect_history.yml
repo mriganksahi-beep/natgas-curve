@@ -110,7 +110,10 @@ jobs:
           def merge(pattern, out):
               fs = sorted(glob.glob(pattern, recursive=True))
               if not fs: return
-              df = pd.concat(pd.read_csv(f) for f in fs).drop_duplicates()
+              parts = [pd.read_csv(f) for f in fs]
+              if os.path.exists(out):  # accumulate across runs
+                  parts.insert(0, pd.read_csv(out))
+              df = pd.concat(parts).drop_duplicates()
               df.to_csv(out, index=False, compression="gzip")
               print(out, len(df), "rows from", len(fs), "files")
           merge("artifacts/gefs_rf_*/**/reforecast_ens5_*.csv", "data/forecasts/gefs_reforecast_ens5.csv.gz")

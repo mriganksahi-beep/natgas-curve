@@ -35,6 +35,9 @@ OUT = ROOT / "data/forecasts/gefs"
 RF = "https://noaa-gefs-retrospective.s3.amazonaws.com/GEFSv12/reforecast"
 OP = "https://noaa-gefs-pds.s3.amazonaws.com"
 SESSION = requests.Session()
+SESSION.mount("https://", requests.adapters.HTTPAdapter(pool_connections=8, pool_maxsize=64))
+import threading
+_DECODE_LOCK = threading.Lock()
 WINTER_MONTHS = (10, 11, 12, 1, 2, 3, 4)
 MAX_LEAD_H = 384
 
@@ -117,45 +120,55 @@ def fetch_messages(file_url: str, want_hours: set[int]):
 
 
 MEMBERS = ("c00", "p01", "p02", "p03", "p04")  # the reforecast has 5 daily members
+POOL = cf.ThreadPoolExecutor(48)  # shared pool for HTTP requests
 
 
-def run_values(init: pd.Timestamp, source: str, mem: str = "c00"):
-    """-> DataFrame(hour, city, temp_k) for one 00Z run of member `mem`, or None if missing."""
+def plan(init: pd.Timestamp, source: str, mem: str):
+    """-> list of (grib_url, wanted forecast hours) for one member's 00Z run."""
     hours = set(range(6, MAX_LEAD_H + 1, 6))
-    blobs = {}
     ymdh = init.strftime("%Y%m%d") + "00"
     if source == "reforecast":
         base = f"{RF}/{init.year}/{ymdh}/{mem}"
-        for part in ("Days%3A1-10", "Days%3A10-16"):
-            got = fetch_messages(f"{base}/{part}/tmp_2m_{ymdh}_{mem}.grib2", hours - set(blobs))
-            blobs.update(got)
-    else:
-        day = init.strftime("%Y%m%d")
-        pre = "gec00" if mem == "c00" else "gep" + mem[1:]
-        if init >= pd.Timestamp("2020-09-23"):
-            def url(h):
-                return (f"{OP}/gefs.{day}/00/atmos/pgrb2sp25/{pre}.t00z.pgrb2s.0p25.f{h:03d}" if h <= 240
-                        else f"{OP}/gefs.{day}/00/atmos/pgrb2ap5/{pre}.t00z.pgrb2a.0p50.f{h:03d}")
-        else:  # GEFS v11: 1 degree, all variables in pgrb2a
-            def url(h):
-                return f"{OP}/gefs.{day}/00/pgrb2a/{pre}.t00z.pgrb2af{h:03d}" if h >= 100 else \
-                       f"{OP}/gefs.{day}/00/pgrb2a/{pre}.t00z.pgrb2af{h:02d}"
-        with cf.ThreadPoolExecutor(8) as ex:
-            futs = {ex.submit(fetch_messages, url(h), {h}): h for h in sorted(hours)}
-            for fu in futs:
-                blobs.update(fu.result())
-    if not blobs:
-        return None
-    rows = []
-    # decode per grid (0.25 and 0.5 deg messages may differ); decode each message separately
-    for h, b in sorted(blobs.items()):
+        return [(f"{base}/Days%3A1-10/tmp_2m_{ymdh}_{mem}.grib2", {h for h in hours if h <= 240}),
+                (f"{base}/Days%3A10-16/tmp_2m_{ymdh}_{mem}.grib2", {h for h in hours if h > 240})]
+    day = init.strftime("%Y%m%d")
+    pre = "gec00" if mem == "c00" else "gep" + mem[1:]
+    if init >= pd.Timestamp("2020-09-23"):
+        return [((f"{OP}/gefs.{day}/00/atmos/pgrb2sp25/{pre}.t00z.pgrb2s.0p25.f{h:03d}" if h <= 240
+                  else f"{OP}/gefs.{day}/00/atmos/pgrb2ap5/{pre}.t00z.pgrb2a.0p50.f{h:03d}"), {h})
+                for h in sorted(hours)]
+    return [(f"{OP}/gefs.{day}/00/pgrb2a/{pre}.t00z.pgrb2af{h:03d}" if h >= 100 else
+             f"{OP}/gefs.{day}/00/pgrb2a/{pre}.t00z.pgrb2af{h:02d}", {h}) for h in sorted(hours)]
+
+
+def fetch_run(init: pd.Timestamp, source: str) -> dict:
+    """-> {member: DataFrame(hour, city, temp_k)} with every HTTP request issued in parallel."""
+    tasks = [(m, url, want) for m in MEMBERS for url, want in plan(init, source, m)]
+    idx = list(POOL.map(lambda t: get(t[1] + ".idx"), tasks))
+    ranges = []
+    for (m, url, want), text in zip(tasks, idx):
+        if text is None:
+            continue
+        seen = set()
+        for start, end, h, _ in parse_idx(text.decode()):
+            if h in want and h not in seen:
+                seen.add(h)
+                ranges.append((m, h, url, start, end if end is not None else start + 5_000_000))
+    blobs = list(POOL.map(lambda r: get(r[2], (r[3], r[4])), ranges))
+    out = {}
+    for (m, h, *_), b in zip(ranges, blobs):
         if b is None:
             continue
-        vals, lats, lons = decode([b])
-        ix = city_index(lats, lons)
-        for (city, _), (i, j) in zip(CITIES.items(), ix):
-            rows.append((h, city, float(vals[0][i, j])))
-    return pd.DataFrame(rows, columns=["hour", "city", "temp_k"])
+        with _DECODE_LOCK:
+            vals, lats, lons = decode([b])
+            ix = city_index(lats, lons)
+        out.setdefault(m, []).extend((h, city, float(vals[0][i, j])) for (city, _), (i, j) in zip(CITIES.items(), ix))
+    return {m: pd.DataFrame(v, columns=["hour", "city", "temp_k"]) for m, v in out.items()}
+
+
+def run_values(init: pd.Timestamp, source: str, mem: str = "c00"):
+    """Single member (kept for spot checks)."""
+    return fetch_run(init, source).get(mem)
 
 
 def daily_means(init: pd.Timestamp, v: pd.DataFrame) -> pd.DataFrame:
@@ -170,7 +183,7 @@ def daily_means(init: pd.Timestamp, v: pd.DataFrame) -> pd.DataFrame:
     return g[["init_date", "valid_et_date", "lead_days", "city", "temp_f"]]
 
 
-def collect(dates, source: str, out_file: Path, workers=8):
+def collect(dates, source: str, out_file: Path, workers=3):
     out_file.parent.mkdir(parents=True, exist_ok=True)
     done = set()
     if out_file.exists():
@@ -181,9 +194,8 @@ def collect(dates, source: str, out_file: Path, workers=8):
 
     def one(d):
         per = {}
-        for m in MEMBERS:
-            v = run_values(d, source, m)
-            if v is not None and len(v):
+        for m, v in fetch_run(d, source).items():
+            if len(v):
                 per[m] = daily_means(d, v).set_index(["init_date", "valid_et_date", "lead_days", "city"]).temp_f
         if "c00" not in per:
             return d, None
