@@ -152,8 +152,11 @@ def forecast_block(days: pd.Series, prev: pd.Series) -> pd.DataFrame:
         r = {"date": d}
         for tag, runs in (("", ens_d), ("_c00", c00_d)):
             new, old = runs.get(d), runs.get(dp)
-            if new is None:
+            if new is None or (new.index.max() - d).days < 15:
                 continue
+            if old is not None and (old.index.max() - dp).days < 15:
+                old = None  # incomplete previous run: news undefined rather than mis-measured
+                r[f"old_run_incomplete{tag}"] = True
             tot = 0.0
             for w, (lo, hi) in W.items():
                 vd = pd.date_range(d + pd.Timedelta(days=lo), d + pd.Timedelta(days=hi))
