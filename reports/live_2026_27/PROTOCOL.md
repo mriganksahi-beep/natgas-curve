@@ -40,7 +40,7 @@ These rules are fixed. The code is `src/live2627.py`, and its frozen parameters 
 - **The PHYS-M2 alarm log.** Both scenario-based tools failed their holdout tests: V5 (calibration) and V7 (overlay). Logging them adds no decision-relevant evidence, and Model 2's weekly end-of-season forecast keeps running in the live storage job anyway.
 
 ## Planned for study v4 (not frozen here)
-Daily snapshots of CPC 6–10 and 8–14-day outlooks and GEFS control forecasts are archived from 23 Nov 2026 by `.github/workflows/collect_forecasts_daily.yml`. Any v4 live rule will be frozen in a dated amendment below **before** it is scored. Only weeks after that freeze date count as live evidence.
+NOAA keeps permanent public archives of the CPC 6–10 and 8–14-day outlooks and the GEFS forecasts, so this winter's forecasts can be collected at any time and need no daily snapshot. Any v4 live rule will be frozen in a dated amendment below **before** it is scored. Only weeks after that freeze date count as live evidence.
 
 ## Change log
 - 2026-11-23: protocol frozen.

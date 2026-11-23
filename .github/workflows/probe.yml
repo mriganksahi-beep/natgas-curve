@@ -7,5 +7,5 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
-        with: {python-version: "3.11"}
-      - run: bash scripts/probe2.sh
+        with: {python-version: "3.12"}
+      - run: bash scripts/smoke_collect.sh

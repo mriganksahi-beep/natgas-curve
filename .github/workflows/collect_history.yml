@@ -1,0 +1,133 @@
+name: Collect free history (forecasts, weather, EIA)
+
+on:
+  workflow_dispatch:
+    inputs:
+      what:
+        description: "all | gefs_reforecast | gefs_operational | cpc | other"
+        default: all
+
+permissions:
+  contents: write
+
+jobs:
+  gefs_reforecast:
+    if: inputs.what == 'all' || inputs.what == 'gefs_reforecast'
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        year: [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
+               2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - run: pip install pandas numpy requests pygrib
+      - run: python -m src.collect.gefs reforecast ${{ matrix.year }}
+      - uses: actions/upload-artifact@v4
+        with: {name: "gefs_rf_${{ matrix.year }}", path: data/forecasts/gefs/}
+
+  gefs_operational:
+    if: inputs.what == 'all' || inputs.what == 'gefs_operational'
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        span:
+          - {a: "2020-01-01", b: "2020-04-30", tag: "2020a"}
+          - {a: "2020-10-01", b: "2021-04-30", tag: "2020-21"}
+          - {a: "2021-10-01", b: "2022-04-30", tag: "2021-22"}
+          - {a: "2022-10-01", b: "2023-04-30", tag: "2022-23"}
+          - {a: "2023-10-01", b: "2024-04-30", tag: "2023-24"}
+          - {a: "2024-10-01", b: "2025-04-30", tag: "2024-25"}
+          - {a: "2025-10-01", b: "2026-04-30", tag: "2025-26"}
+          - {a: "2026-10-01", b: "2026-11-22", tag: "2026-27"}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - run: pip install pandas numpy requests pygrib
+      - run: python -m src.collect.gefs operational ${{ matrix.span.a }} ${{ matrix.span.b }} ${{ matrix.span.tag }}
+      - uses: actions/upload-artifact@v4
+        with: {name: "gefs_op_${{ matrix.span.tag }}", path: data/forecasts/gefs/}
+
+  cpc:
+    if: inputs.what == 'all' || inputs.what == 'cpc'
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        span:
+          - {a: "2012-09-11", b: "2015-12-31", tag: "2012-15"}
+          - {a: "2016-01-01", b: "2018-12-31", tag: "2016-18"}
+          - {a: "2019-01-01", b: "2021-12-31", tag: "2019-21"}
+          - {a: "2022-01-01", b: "2024-06-30", tag: "2022-24"}
+          - {a: "2024-07-01", b: "2026-11-22", tag: "2024-26"}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - run: pip install pandas requests pyshp shapely
+      - run: python -m src.collect.cpc ${{ matrix.span.a }} ${{ matrix.span.b }} ${{ matrix.span.tag }}
+      - uses: actions/upload-artifact@v4
+        with: {name: "cpc_${{ matrix.span.tag }}", path: data/forecasts/cpc/}
+
+  other:
+    if: inputs.what == 'all' || inputs.what == 'other'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - run: pip install pandas requests
+      - run: python -m src.collect.history eia
+      - run: python -m src.collect.history weather
+      - uses: actions/upload-artifact@v4
+        with: {name: "other", path: "data/raw/eia/\ndata/weather/"}
+
+  commit:
+    needs: [gefs_reforecast, gefs_operational, cpc, other]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - uses: actions/download-artifact@v4
+        with: {path: artifacts}
+      - name: Merge and compress
+        run: |
+          pip install pandas
+          python - <<'PY'
+          import glob, os, pandas as pd, shutil
+          os.makedirs("data/forecasts", exist_ok=True)
+          def merge(pattern, out):
+              fs = sorted(glob.glob(pattern, recursive=True))
+              if not fs: return
+              df = pd.concat(pd.read_csv(f) for f in fs).drop_duplicates()
+              df.to_csv(out, index=False, compression="gzip")
+              print(out, len(df), "rows from", len(fs), "files")
+          merge("artifacts/gefs_rf_*/**/reforecast_c00_*.csv", "data/forecasts/gefs_reforecast_c00.csv.gz")
+          merge("artifacts/gefs_op_*/**/operational_c00_*.csv", "data/forecasts/gefs_operational_c00.csv.gz")
+          merge("artifacts/cpc_*/**/cpc_outlooks_*.csv", "data/forecasts/cpc_outlooks.csv.gz")
+          if os.path.isdir("artifacts/other"):
+              for root, _, files in os.walk("artifacts/other"):
+                  for f in files:
+                      src = os.path.join(root, f); rel = os.path.relpath(src, "artifacts/other")
+                      dst = os.path.join("data", rel) if not rel.startswith("data") else rel
+                      os.makedirs(os.path.dirname(dst), exist_ok=True); shutil.copy(src, dst); print("copied", dst)
+          PY
+          rm -rf artifacts
+      - name: Commit
+        run: |
+          git config user.name "data-collector-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/forecasts data/raw/eia data/weather 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Nothing to commit"; else
+            git commit -m "Collected free history $(date -u +%Y-%m-%d)" && git pull --rebase -q && git push; fi
