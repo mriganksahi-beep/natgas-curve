@@ -1,0 +1,171 @@
+{
+  "r_front": {
+    "terms": [
+      "news_w1",
+      "news_w2",
+      "news_w3"
+    ],
+    "scale": null,
+    "intercept": -0.2675502397069708,
+    "slopes": [
+      0.05978651382720122,
+      0.01728389051781814,
+      0.03873547433032392
+    ],
+    "n_fit": 934,
+    "first_winter": 2011,
+    "last_winter": 2022,
+    "fit_months": [
+      11,
+      12,
+      1,
+      2
+    ],
+    "vintage": "frozen_dev_W2011-W2022_to_2021-12-31"
+  },
+  "r_second": {
+    "terms": [
+      "news_w1",
+      "news_w2",
+      "news_w3"
+    ],
+    "scale": null,
+    "intercept": -0.26310789276159907,
+    "slopes": [
+      0.05005051034141327,
+      0.011809284247308446,
+      0.035565713310948315
+    ],
+    "n_fit": 934,
+    "first_winter": 2011,
+    "last_winter": 2022,
+    "fit_months": [
+      11,
+      12,
+      1,
+      2
+    ],
+    "vintage": "frozen_dev_W2011-W2022_to_2021-12-31"
+  },
+  "r_strip": {
+    "terms": [
+      "news_w1",
+      "news_w2",
+      "news_w3"
+    ],
+    "scale": null,
+    "intercept": -0.2601198339246812,
+    "slopes": [
+      0.059796433898874644,
+      0.014389155031080176,
+      0.03938016824706078
+    ],
+    "n_fit": 890,
+    "first_winter": 2011,
+    "last_winter": 2022,
+    "fit_months": [
+      11,
+      12,
+      1,
+      2
+    ],
+    "vintage": "frozen_dev_W2011-W2022_to_2021-12-31"
+  },
+  "d_hj": {
+    "terms": [
+      "news_tot"
+    ],
+    "scale": null,
+    "intercept": -0.0028906250278593944,
+    "slopes": [
+      0.0002482817403911883
+    ],
+    "n_fit": 912,
+    "first_winter": 2011,
+    "last_winter": 2022,
+    "fit_months": [
+      11,
+      12,
+      1,
+      2
+    ],
+    "vintage": "frozen_dev_W2011-W2022_to_2021-12-31"
+  },
+  "weekly": {
+    "r_front": {
+      "terms": [
+        "news_w1",
+        "news_w2",
+        "news_w3"
+      ],
+      "scale": null,
+      "intercept": -1.385520369732787,
+      "slopes": [
+        0.11127462246082917,
+        0.06539171250157322,
+        0.07936739614489363
+      ],
+      "n_fit": 198,
+      "first_winter": 2011,
+      "last_winter": 2022,
+      "vintage": "frozen_weekly_dev_W2011-W2022"
+    },
+    "r_second": {
+      "terms": [
+        "news_w1",
+        "news_w2",
+        "news_w3"
+      ],
+      "scale": null,
+      "intercept": -1.355726757359848,
+      "slopes": [
+        0.09419956242191158,
+        0.053709889255586764,
+        0.07193024235411581
+      ],
+      "n_fit": 198,
+      "first_winter": 2011,
+      "last_winter": 2022,
+      "vintage": "frozen_weekly_dev_W2011-W2022"
+    },
+    "r_strip": {
+      "terms": [
+        "news_w1",
+        "news_w2",
+        "news_w3"
+      ],
+      "scale": null,
+      "intercept": -1.2158117544397882,
+      "slopes": [
+        0.09553305705636468,
+        0.06868376084796657,
+        0.07613453807767971
+      ],
+      "n_fit": 189,
+      "first_winter": 2011,
+      "last_winter": 2022,
+      "vintage": "frozen_weekly_dev_W2011-W2022"
+    },
+    "d_hj": {
+      "terms": [
+        "news_tot"
+      ],
+      "scale": {
+        "c": 0.1
+      },
+      "intercept": -0.013053963078550829,
+      "slopes": [
+        0.004696334422806561
+      ],
+      "n_fit": 193,
+      "first_winter": 2011,
+      "last_winter": 2022,
+      "vintage": "frozen_weekly_dev_W2011-W2022"
+    }
+  },
+  "_meta": {
+    "created": "2026-11-23",
+    "data_cut": "2021-12-31",
+    "definition": "news_part = sum_k slope_k * news_wk * g; g = 1, or max(hj - d_hj, 0) + c for d_hj; premium_part = move - news_part (intercept excluded)"
+  }
+}

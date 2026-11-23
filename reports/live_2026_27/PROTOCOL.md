@@ -42,5 +42,23 @@ These rules are fixed. The code is `src/live2627.py`, and its frozen parameters 
 ## Planned for study v4 (not frozen here)
 NOAA keeps permanent public archives of the CPC 6–10 and 8–14-day outlooks and the GEFS forecasts, so this winter's forecasts can be collected at any time and need no daily snapshot. Any v4 live rule will be frozen in a dated amendment below **before** it is scored. Only weeks after that freeze date count as live evidence.
 
+
+## Amendment 1 (23 Nov 2026, frozen before 1 Dec 2026): study v4 live tests
+These are frozen from `reports/synthesis_v4.md`. Nothing from 1 Dec 2026 onward had been observed when they were written.
+- **L3 (T-OPT1), the options volatility premium on March−April.**
+  - G = mean over trading days d ∈ [1 Dec 2026, 22 Jan 2027] of nv_hj(d) − RV_life(d).
+  - nv_hj is the Bachelier ATM implied vol of H27−J27 from G4X Mar-27 settles, computed as in `src/v4/panel.option_block`. RV_life(d) is √(Σ ΔS_t² over t > d up to the option expiry, ÷ T_d).
+  - **Pass:** G > 0. This is a single draw; the development prior is about 85%.
+  - Data: the user's Databento pull after the March 2027 option expiry.
+- **L4, the protected short (descriptive).**
+  - Short H27−J27 at the 1 Dec 2026 settle and buy the G4X Mar-27 call at K = F + $0.25 (rounded to $0.05), paying settle × 1.04.
+  - Report the protection cost, and the protected vs naked worst drawdown and expiry P&L.
+- **L5, the 1 Dec carry family (log).**
+  - The plain short from the 1 Dec 2026 settle, half size, and the E rule: enter on the first day on or after 1 Dec when the 5-day mean of (lvl_w2 + lvl_w3)/36.85 ≤ 1.0.
+  - Report the daily path, worst drawdown and expiry P&L.
+  - Inputs are Yahoo settles and the GEFS operational 00Z archive, processed through `src/v4/forecasts.py`.
+- **L6, weekly news/premium log** for the second month and H−J, using `decompose_weekly(mode="frozen")`.
+
 ## Change log
-- 2026-11-23: protocol frozen. First run committed (L1 from both entries; L2 with 1 week scored). Yahoo = CME settle check passed (see Data).
+- 2026-11-23: protocol frozen.
+- 2026-11-23: Amendment 1 (study v4 live tests L3–L6) frozen before 1 Dec 2026. First run committed (L1 from both entries; L2 with 1 week scored). Yahoo = CME settle check passed (see Data).
