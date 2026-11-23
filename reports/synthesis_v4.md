@@ -1,5 +1,13 @@
 # Study v4 synthesis: news vs premium in the gas curve
 
+> **Locked-sample result (run once, 23 Nov 2026; `reports/holdout/SUMMARY_v4.md`):**
+> - **P1 FAILED.** In 2000–10 the weekly premium part continued (β +0.40) instead of reversing.
+> - **S1 failed.** The news split transfers only weakly.
+> - **S2 passed at 5 days only.**
+> - **S3 PASSED.** The March−April carry earned +$3.4k per winter, positive in 7 of 10 winters, but with a −$29k drawdown in 2002-03.
+>
+> Conclusion 3 below is therefore regime-specific (2010–21), not a stable property.
+
 *23 Nov 2026. Based on five agent reports (`reports/agents/v4_*.md`) and an independent review (`reports/agents/review_v4.md`). All evidence uses development data, 7 Jun 2010 to 31 Dec 2021. The 2000–2010 sample is still locked. The tests below were frozen and committed before it was opened.*
 
 ## What survived review
