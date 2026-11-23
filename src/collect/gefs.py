@@ -120,7 +120,7 @@ def fetch_messages(file_url: str, want_hours: set[int]):
 
 
 MEMBERS = ("c00", "p01", "p02", "p03", "p04")  # the reforecast has 5 daily members
-POOL = cf.ThreadPoolExecutor(48)  # shared pool for HTTP requests
+POOL = cf.ThreadPoolExecutor(24)  # shared pool for HTTP requests
 
 
 def plan(init: pd.Timestamp, source: str, mem: str):
@@ -183,7 +183,23 @@ def daily_means(init: pd.Timestamp, v: pd.DataFrame) -> pd.DataFrame:
     return g[["init_date", "valid_et_date", "lead_days", "city", "temp_f"]]
 
 
-def collect(dates, source: str, out_file: Path, workers=3):
+def _one(args):
+    d, source = args
+    per = {}
+    for m, v in fetch_run(d, source).items():
+        if len(v):
+            per[m] = daily_means(d, v).set_index(["init_date", "valid_et_date", "lead_days", "city"]).temp_f
+    if "c00" not in per:
+        return d, None
+    out = per["c00"].rename("temp_c00").to_frame()
+    ens = pd.concat(per.values(), axis=1)
+    out["temp_ens"] = ens.mean(axis=1).round(2)
+    out["n_mem"] = ens.notna().sum(axis=1)
+    return d, out.reset_index()
+
+
+def collect(dates, source: str, out_file: Path, workers=4):
+    """Fetch runs in `workers` processes (GRIB decoding is CPU-bound); resumable."""
     out_file.parent.mkdir(parents=True, exist_ok=True)
     done = set()
     if out_file.exists():
@@ -191,23 +207,9 @@ def collect(dates, source: str, out_file: Path, workers=3):
     todo = [d for d in dates if d.strftime("%Y-%m-%d") not in done]
     print(f"{source}: {len(todo)} runs to fetch -> {out_file.name}", flush=True)
     t0 = time.time()
-
-    def one(d):
-        per = {}
-        for m, v in fetch_run(d, source).items():
-            if len(v):
-                per[m] = daily_means(d, v).set_index(["init_date", "valid_et_date", "lead_days", "city"]).temp_f
-        if "c00" not in per:
-            return d, None
-        out = per["c00"].rename("temp_c00").to_frame()
-        ens = pd.concat(per.values(), axis=1)
-        out["temp_ens"] = ens.mean(axis=1).round(2)
-        out["n_mem"] = ens.notna().sum(axis=1)
-        return d, out.reset_index()
-
     frames, missing = [], []
-    with cf.ThreadPoolExecutor(workers) as ex:
-        for k, (d, df) in enumerate(ex.map(one, todo)):
+    with cf.ProcessPoolExecutor(workers) as ex:
+        for k, (d, df) in enumerate(ex.map(_one, [(d, source) for d in todo])):
             if df is None or df.empty:
                 missing.append(str(d.date()))
             else:

@@ -1,9 +1,10 @@
 set -e
 pip -q install pandas numpy requests pygrib
+nproc
 python - <<'PY'
 import pandas as pd, time
+from pathlib import Path
 from src.collect import gefs
-for src, d in [("reforecast","2005-01-10"),("operational","2020-01-15"),("operational","2023-01-10")]:
-    t=time.time(); r=gefs.fetch_run(pd.Timestamp(d), src)
-    print(src, d, f"{time.time()-t:.1f}s", {m: len(v) for m, v in r.items()})
+t=time.time(); gefs.collect(list(pd.date_range("2005-01-03","2005-01-14")), "reforecast", Path("/tmp/t.csv"))
+print("12 reforecast runs", f"{time.time()-t:.0f}s"); print(pd.read_csv("/tmp/t.csv").head(3).to_string())
 PY
