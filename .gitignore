@@ -15,3 +15,6 @@ data/raw/ng_statistics_batch/
 data/processed/model3_*.csv
 data/processed/research_*/
 data/processed/shared/
+
+# CME options via Databento: licensed, not for redistribution
+data/raw/options/

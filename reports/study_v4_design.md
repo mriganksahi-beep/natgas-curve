@@ -1,6 +1,6 @@
 # Study v4 (draft): news vs premium in the gas curve
 
-*Draft, 23 Nov 2026. To be finalised once the data inventory is confirmed. Nothing in it has yet been tested against outcomes.*
+*Draft, 23 Nov 2026; data inventory confirmed the same evening. Nothing in it has yet been tested against outcomes.*
 
 ## Question
 Every move in the gas curve is either **news**, a change in expected weather and therefore expected scarcity, or a **change in the risk premium**. News should persist and premium shocks should mean-revert.
@@ -13,15 +13,15 @@ Studies v2 and v3 could only split the two *after the fact*, because they used r
 ## Data (all free unless marked)
 | Block | Source | Span |
 | --- | --- | --- |
-| Weather forecasts | GEFS v12 reforecast, 5 members daily (00Z), 2 m temperature at 17 cities, leads 0–15 days | 2000–2019 |
-| | GEFS operational (v11 to Sep 2020, then v12), same members | Jan 2020 – now |
-| | CPC 6–10 / 8–14-day outlooks (category and probability at 17 cities) | Sep 2012 – now |
+| Weather forecasts | GEFS v12 reforecast, 5 members daily (00Z), 2 m temperature at 17 cities, leads 0–15 days: **complete** (4,245 winter runs, none missing) | 2000–2019 |
+| | GEFS operational (v11 to Sep 2020, then v12), same members: **complete** (1,447 winter runs) | Jan 2020 – now |
+| | CPC 6–10 / 8–14-day outlooks (category and probability at 17 cities). Complete from 2015; about 70–85% of days in 2013–14 (the rest are unavailable from NOAA) | Sep 2012 – now |
 | Realised weather | Open-Meteo archive, 17 cities, daily | 2000 – now |
 | Prices | EIA front 4 contracts. The contract mapping was validated against CME: 97% of 2010–24 days match exactly; the rest are rounding and roll days | 1994 – Apr 2024 |
 | | Databento full curve *(licensed, private)* | Jun 2010 – now |
 | | Yahoo individual contracts (equal to CME settles; checked) | live |
-| Storage | EIA weekly (2010+) plus pre-2010 history workbook | 1994 – now |
-| Options | Databento: products and cost to be scoped *(licensed)* | TBD |
+| Storage | EIA weekly. No free pre-2010 weekly series was found, so holdout A runs without storage surprises | 2010 – now |
+| Options *(licensed, private; $26.50)* | Databento daily settlements, near-the-money strikes. **ON**: monthly options on each contract, 2010-06 onward. **G4X**: 1-month calendar spread options (the March options are on March−April), winters 2013–2027 (2013–14 thin). **G3B**: 3-month spread options; **G6B**: 6-month. Underlyings verified against futures by put-call parity (median error $0.000) | 2010 / 2012 – now |
 
 ## Samples
 - **Development:** winters 2010-11 to 2021-22, cut at 31 Dec 2021. This is the same cut as v2 and v3.
@@ -52,7 +52,7 @@ Studies v2 and v3 could only split the two *after the fact*, because they used r
 | 2 | `private_info` | Does the unexplained part contain *better* weather information than GEFS (ECMWF, private forecasters)? | Does the residual predict realised weather beyond GEFS? If yes, part of the "premium" is news we can't see, and it should persist rather than reverse |
 | 3 | `premium_shocks` | Does the forecast-unexplained move reverse while the news-explained move persists? Per instrument, at 1–20-day horizons. Classify spike episodes ex ante | Reversal slopes with HAC errors and winter bootstrap; episode table (2014, Nov 2018, 2021, …); a costed outright "fade premium shocks" rule, which gives many trades and statistical power |
 | 4 | `widowmaker_v4` | Can the decomposition improve the March−April short, e.g. hold through premium spikes and cut only when the forecast turns persistently cold? | Premium kept per unit of worst drawdown vs plain short and **half size** (the benchmark nothing beat in v3) |
-| 5 | `options` *(if data)* | What does the market charge for path risk? Implied vol of H and J, and calendar-spread-option implied vol of H−J vs realised. Do premium shocks coincide with implied vol spikes? | Variance risk premium; the cost of a protective H−J call spread vs the premium earned |
+| 5 | `options` | What does the market charge for path risk? Black-76 implied vol of H, J and the front month (ON). Bachelier (normal) implied vol of H−J from G4X, in $/MMBtu, because spreads can be negative, vs realised spread volatility. Do premium shocks coincide with implied-vol spikes? | Spread variance risk premium by winter and lead; whether CSO implied vol prices the v3 drawdowns ex ante; the net premium of short H−J plus a long G4X call spread vs a naked short and half size. Samples: dev winters 2013–2021; 2022–26 descriptive; live March 2027 |
 
 Agent 1 runs first, because its news definition feeds agents 2–4. Agents 2–5 run in parallel. Then the review, then frozen tests on holdout A, plus a live amendment.
 
