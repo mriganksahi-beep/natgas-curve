@@ -4,6 +4,23 @@ How far up the chain **weather → weekly storage → end-of-season storage → 
 
 Everything here uses public data (EIA, Open-Meteo, and later CME settlements via Databento). Every test was written down in [`reports/protocol.md`](reports/protocol.md) before its results were seen. That file also logs every change and every model version's score, including the weaker ones.
 
+## Winter Squeeze-Risk Monitor (24 Nov 2026)
+
+![monitor](reports/tool/figures/monitor.png)
+
+Each week, from November to mid-February, the monitor reads the March–April spread-option prices and turns them into the market's odds for end-March storage. It puts those odds next to a physical model built from storage, weather and analog years.
+
+**Today (17 Nov 2026), winter 2026-27:**
+- The options imply a **12%** chance that storage ends 400+ Bcf below its 5-year average (map band 7–16%).
+- The physical model says **9%**.
+- The options price a **3%** chance of a 25c+ March–April squeeze at expiry.
+- Both legs put the median end-March near +110 to +130 Bcf vs the 5-year average.
+
+**Test result, frozen before running** (`reports/tool/GATE.md`, then `GATE_RESULT.md`):
+- On the untouched 2022–26 storage outcomes, the options-implied odds **lost to climatology**. No winter ended in deficit, yet the options priced 15–25% deficit odds and 6–14% squeeze odds every year.
+- So the monitor is a **market-reading** tool, not a storage forecaster. The tail the options carry matches the squeeze premium found elsewhere in this repo, but this test cannot prove that.
+- Exploratory, not pre-registered: in both samples the physical model's fair spread tracked the realised expiry spread better than the futures forward did (correlation 0.52 vs 0.28 in 2012–21; 0.68 vs −0.23 in 2022–26).
+
 ## Results so far (updated 19 Nov 2026)
 **Model 1: this week's storage change, from this week's weather.** Out of sample from 2022 (253 weeks):
 
