@@ -59,6 +59,18 @@ These are frozen from `reports/synthesis_v4.md`. Nothing from 1 Dec 2026 onward 
   - Inputs are Yahoo settles and the GEFS operational 00Z archive, processed through `src/v4/forecasts.py`.
 - **L6, weekly news/premium log** for the second month and H−J, using `decompose_weekly(mode="frozen")`.
 
+## Amendment 2 (24 Nov 2026, frozen before 1 Dec 2026): study v5 options live tests
+These are frozen from `reports/synthesis_v5.md`. The runner logic is `src/research/reviewer_v5/frozen_ref.py`.
+- **LV-P, CSO vol richness on G4X Mar-27 (H27−J27).**
+  - Statistic: the mean over trading days d from 1 Dec 2026 to the option expiry (23 Feb 2027) of ln(nv(d) / RV_life(d)).
+  - It covers days where the previous day's CSO open interest > 0. nv comes from the Bachelier ATM straddle; RV_life is the realised normal vol of daily H27−J27 changes from d to expiry.
+  - **Pass:** mean > 0.
+- **LV-S1, loose-storage winter vol.** Scored **only if** the EIA report released in the week of 1 Dec 2026 shows Lower-48 storage > 150 Bcf above its 5-year average for that week.
+  - Statistic: the mean of ATM IV − realised vol to expiry for the Jan-27, Feb-27 and Mar-27 ON options, from 1 Dec 2026 to each expiry.
+  - **Pass:** mean > 0.
+- **Data:** the user's Databento statistics pull after the Mar-27 option expiry, rebuilt with `src/v5/options_panel.py`.
+
 ## Change log
 - 2026-11-23: protocol frozen.
-- 2026-11-23: Amendment 1 (study v4 live tests L3–L6) frozen before 1 Dec 2026. First run committed (L1 from both entries; L2 with 1 week scored). Yahoo = CME settle check passed (see Data).
+- 2026-11-23: Amendment 1 (study v4 live tests L3–L6) frozen before 1 Dec 2026.
+- 2026-11-24: Amendment 2 (study v5 options live tests LV-P, LV-S1) frozen before 1 Dec 2026. First run committed (L1 from both entries; L2 with 1 week scored). Yahoo = CME settle check passed (see Data).
