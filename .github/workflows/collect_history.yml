@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       what:
-        description: "all | gefs_reforecast | gefs_wed | gefs_sd | gefs_operational | cpc | other"
+        description: "all | gefs_reforecast | gefs_wed | gefs_sd | gefs_operational | cpc | other | eia_monthly"
         default: all
 
 permissions:
@@ -128,8 +128,21 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: {name: "other", path: "data/raw/eia/\ndata/weather/"}
 
+  eia_monthly:
+    if: inputs.what == 'eia_monthly'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - run: pip install pandas requests
+      - run: python -m src.collect.history eia_monthly
+      - uses: actions/upload-artifact@v4
+        with: {name: "other_eia_monthly", path: "data/raw/eia/storage_monthly_series_bulk.csv"}
+
   commit:
-    needs: [gefs_reforecast, gefs_wed, gefs_sd_rf, gefs_operational, cpc, other]
+    needs: [gefs_reforecast, gefs_wed, gefs_sd_rf, gefs_operational, cpc, other, eia_monthly]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -158,6 +171,10 @@ jobs:
           merge("artifacts/gefs_rf*/**/reforecast_ens5_*.csv", "data/forecasts/gefs_reforecast_ens5.csv.gz")
           merge("artifacts/gefs_op_*/**/operational_ens5_*.csv", "data/forecasts/gefs_operational_ens5.csv.gz")
           merge("artifacts/cpc_*/**/cpc_outlooks_*.csv", "data/forecasts/cpc_outlooks.csv.gz")
+          if os.path.isdir("artifacts/other_eia_monthly"):
+              for root, _, files in os.walk("artifacts/other_eia_monthly"):
+                  for f in files:
+                      os.makedirs("data/raw/eia", exist_ok=True); shutil.copy(os.path.join(root, f), os.path.join("data/raw/eia", f)); print("copied", f)
           if os.path.isdir("artifacts/other"):
               for root, _, files in os.walk("artifacts/other"):
                   for f in files:

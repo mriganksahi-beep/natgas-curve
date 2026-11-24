@@ -74,5 +74,27 @@ def eia():
     print(df.groupby("series_id").date.agg(["min", "max", "count"]))
 
 
+def eia_monthly():
+    """All monthly natural-gas STORAGE series from the EIA bulk file (e.g. NG.N5020US2.M total working gas)."""
+    out = ROOT / "data/raw/eia"
+    out.mkdir(parents=True, exist_ok=True)
+    z = requests.get("https://www.eia.gov/opendata/bulk/NG.zip", timeout=300)
+    z.raise_for_status()
+    rows = []
+    with zipfile.ZipFile(io.BytesIO(z.content)) as zf:
+        for line in io.TextIOWrapper(zf.open(zf.namelist()[0]), encoding="utf-8"):
+            if '"f":"M"' not in line:
+                continue
+            j = json.loads(line)
+            name = (j.get("name") or "").lower()
+            if "storage" not in name and "working gas" not in name:
+                continue
+            for d, v in j.get("data", []):
+                rows.append((j["series_id"], j.get("name"), j.get("units"), d, v))
+    df = pd.DataFrame(rows, columns=["series_id", "name", "units", "month", "value"])
+    df.to_csv(out / "storage_monthly_series_bulk.csv", index=False)
+    print(df.groupby(["series_id", "name"]).month.agg(["min", "max", "count"]).to_string()[:6000])
+
+
 if __name__ == "__main__":
-    {"weather": weather, "eia": eia}[sys.argv[1]]()
+    {"weather": weather, "eia": eia, "eia_monthly": eia_monthly}[sys.argv[1]]()
