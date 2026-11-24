@@ -1,5 +1,12 @@
 # Study v5 synthesis: what natural gas options know
 
+> **Locked 2022–26 result (run once, 24 Nov 2026; `reports/holdout/SUMMARY_v5.md`):**
+> - **P PASSED.** CSO vol richness was +0.24 [0.065, 0.42].
+> - **S1 failed** (+4.7, lower bound below 0).
+> - **S2 failed** as expected (+$176, lower bound below 0).
+> - **S3 failed** the fairness band (+2.4, CI spans 0).
+> - Tight-storage cheapness, which was logged but not frozen, **reversed** to rich.
+
 *24 Nov 2026. Based on five agent reports (`reports/agents/v5_*.md`) and an independent review (`reports/agents/review_v5.md`). Everything was developed on options data up to 31 Dec 2021. The 2022–2026 options sample stays locked until the frozen tests below have been committed.*
 
 ## The question

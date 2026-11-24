@@ -1,0 +1,13 @@
+PRIMARY ln(nv/RV_S): mean 0.240 [0.065,0.420] median 0.361 blocks 6 n 1645
+   window 2022-2027: mean 0.240 n 1645
+  gas-year means {2022: -0.16, 2023: 0.29, 2024: 0.51, 2025: 0.27, 2026: -0.04, 2027: 0.46}  share>0 0.67
+  H-J only mean 0.289 n 259
+S1 short CSO straddle net $/trade @4%: 176 [-40,395] n 49; @8% 113; worst -1947; mean prem 1575
+   2010-2016 n 0 net4 nan
+   2017-2021 n 0 net4 nan
+  by gas year {2022: 204.0, 2023: 5204.0, 2024: 3694.0, 2025: -399.0, 2026: -1426.0, 2027: 1342.0}
+S3 all deliveries 10-126td IV-RV_life: 2.43 [-3.46,7.69] gas-years 6 rows 6076
+S2 loose: 6.5 [-1.3,15.3] gas-years 4 rows 1896; by gy {2023: 27.5, 2024: 14.6, 2025: 1.5, 2026: -3.1}
+S2 tight: 13.1 [-1.6,15.4] gas-years 4 rows 530; by gy {2022: -2.8, 2023: 14.6, 2025: 1.7, 2026: 47.6}
+S2 loose td<=126: 4.7 [-2.7,14.4] gas-years 4 rows 1294; by gy {2023: 12.0, 2024: 14.5, 2025: -0.3, 2026: -3.0}
+S2 tight td<=126: 15.9 [8.3,47.6] gas-years 3 rows 324; by gy {2022: 8.3, 2023: 15.8, 2026: 47.6}
