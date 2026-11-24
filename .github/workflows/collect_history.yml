@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       what:
-        description: "all | gefs_reforecast | gefs_wed | gefs_operational | cpc | other"
+        description: "all | gefs_reforecast | gefs_wed | gefs_sd | gefs_operational | cpc | other"
         default: all
 
 permissions:
@@ -49,8 +49,26 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: {name: "gefs_rf_${{ matrix.year }}w", path: data/forecasts/gefs/}
 
+  gefs_sd_rf:
+    if: inputs.what == 'gefs_sd'
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        year: [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
+        half: [a, b]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - run: pip install pandas numpy requests pygrib
+      - run: python -m src.collect.gefs reforecast ${{ matrix.year }} ${{ matrix.half }}
+      - uses: actions/upload-artifact@v4
+        with: {name: "gefs_rf_sd_${{ matrix.year }}${{ matrix.half }}", path: data/forecasts/gefs/}
+
   gefs_operational:
-    if: inputs.what == 'all' || inputs.what == 'gefs_operational'
+    if: inputs.what == 'all' || inputs.what == 'gefs_operational' || inputs.what == 'gefs_sd'
     runs-on: ubuntu-latest
     timeout-minutes: 340
     strategy:
@@ -64,7 +82,7 @@ jobs:
           - {a: "2023-10-01", b: "2024-04-30", tag: "2023-24"}
           - {a: "2024-10-01", b: "2025-04-30", tag: "2024-25"}
           - {a: "2025-10-01", b: "2026-04-30", tag: "2025-26"}
-          - {a: "2026-10-01", b: "2026-11-22", tag: "2026-27"}
+          - {a: "2026-10-01", b: "2026-11-23", tag: "2026-27"}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -111,7 +129,7 @@ jobs:
         with: {name: "other", path: "data/raw/eia/\ndata/weather/"}
 
   commit:
-    needs: [gefs_reforecast, gefs_wed, gefs_operational, cpc, other]
+    needs: [gefs_reforecast, gefs_wed, gefs_sd_rf, gefs_operational, cpc, other]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -137,7 +155,7 @@ jobs:
               df = df.drop_duplicates(subset=keys, keep="last")  # later collections win
               df.to_csv(out, index=False, compression="gzip")
               print(out, len(df), "rows from", len(fs), "files")
-          merge("artifacts/gefs_rf_*/**/reforecast_ens5_*.csv", "data/forecasts/gefs_reforecast_ens5.csv.gz")
+          merge("artifacts/gefs_rf*/**/reforecast_ens5_*.csv", "data/forecasts/gefs_reforecast_ens5.csv.gz")
           merge("artifacts/gefs_op_*/**/operational_ens5_*.csv", "data/forecasts/gefs_operational_ens5.csv.gz")
           merge("artifacts/cpc_*/**/cpc_outlooks_*.csv", "data/forecasts/cpc_outlooks.csv.gz")
           if os.path.isdir("artifacts/other"):

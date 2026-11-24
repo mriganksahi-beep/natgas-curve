@@ -198,6 +198,7 @@ def _one(args):
     ens = pd.concat(per.values(), axis=1)
     out["temp_ens"] = ens.mean(axis=1).round(2)
     out["n_mem"] = ens.notna().sum(axis=1)
+    out["temp_sd"] = ens.std(axis=1, ddof=1).round(3)  # ensemble disagreement (5 members)
     return d, out.reset_index()
 
 
