@@ -16,7 +16,7 @@ a.axhline(0, color=INK2, lw=0.8)
 a.grid(axis="y", color=GRID, lw=0.8, zorder=0)
 a.set_xticks(h.Y[::2]); a.set_xticklabels([f"{y%100:02d}" for y in h.Y[::2]])
 a.set_ylabel("$ thousand per spread")
-a.set_title(f"Short March−April futures, 1 Dec → expiry: positive in {int((h.pnl>0).sum())} of {len(h)} winters",
+a.set_title(f"Selling the March−April spread, 1 Dec to expiry: profitable in {int((h.pnl>0).sum())} of {len(h)} winters",
             loc="left", color=INK, fontsize=11)
 a.annotate("2003 squeeze: −$28k", (2003, -28.4), xytext=(2005.2, -24), color=INK2, fontsize=9,
            arrowprops=dict(arrowstyle="-", color=INK2, lw=0.8))
@@ -35,11 +35,11 @@ for i, v in enumerate(pct(m)):
     b.text(i + 0.3, v, f"+{v:.0f}%", va="center", color=INK, fontsize=10)
 b.axhline(0, color=INK2, lw=0.8); b.grid(axis="y", color=GRID, lw=0.8, zorder=0)
 b.set_xticks([0, 1]); b.set_xticklabels(lab); b.set_xlim(-0.5, 1.7)
-b.set_ylabel("Implied vs realised spread vol")
+b.set_ylabel("Implied movement above actual movement")
 b.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"+{v:.0f}%" if v > 0 else f"{v:.0f}%"))
-b.set_title("Spread options price more vol than realised", loc="left", color=INK, fontsize=11)
+b.set_title("Options overstated the spread's movement", loc="left", color=INK, fontsize=11)
 for s in ("top", "right"): b.spines[s].set_visible(False)
-fig.text(0.01, 0.01, "Bars: mean; whiskers: 95% winter-block bootstrap. Calendar-spread options on adjacent gas months, open interest > 0.",
+fig.text(0.01, 0.01, "Right panel: bars show the average; vertical lines show 95% confidence intervals, resampling whole winters. Options on spreads between adjacent months.",
          color=INK2, fontsize=8)
 fig.tight_layout(rect=(0, 0.04, 1, 1))
 fig.savefig("reports/figures/hero.png", dpi=160)

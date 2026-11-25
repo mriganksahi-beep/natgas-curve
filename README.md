@@ -4,146 +4,114 @@
 
 ## Abstract
 
-This paper asks where weather and storage information shows up in US natural gas futures and options. Mostly it does not show up where I expected: storage surprises barely move the March–April spread, and none of the relative-value rules I tested survived a holdout.
-
-One effect survives every test. The market charges an insurance premium against an end-of-winter squeeze, and it appears in both futures and options:
-- **Futures.** Shorting the March–April spread from 1 December to expiry earned money in 21 of 26 winters (2001–2026), with rare but large losses.
-- **Options.** Calendar-spread options priced 39% more spread volatility than was realised in 2010–2021. On 2022–2026, a period held back and tested once, they priced 27% more (95% CI 7% to 52%).
-
-Along the way I built a weekly storage forecast that runs live, and a monitor that reads the premium from option prices each week.
+This paper asks whether public information about weather and gas storage can be used to anticipate prices in the US natural gas market. Storage proves to be quite predictable from the weather. Prices, however, respond to the weather well before the storage data confirm its effect, so a storage forecast says little about prices that the market does not already know. One effect nonetheless survives every test: the market pays a persistent premium for protection against a gas shortage at the end of winter. Selling the March–April futures spread in December and holding it to expiry earned money in 21 of 26 winters. Options on these spreads were priced for 27% to 39% more price movement than subsequently occurred, including in a period that was set aside and tested only once. The paper also describes a weekly monitor that measures the size of this premium from current option prices.
 
 ![Figure 1](reports/figures/hero.png)
-*Figure 1. Left: P&L of one short March–April futures spread, held from 1 December to the March option expiry, by winter. Right: how much more spread volatility calendar-spread options implied than was later realised, in the development period and in the untouched holdout. Whiskers are 95% winter-block bootstrap intervals.*
+*Figure 1. Left: the profit or loss from selling one March–April futures spread on 1 December and holding it to expiry, for each winter from 2001 to 2026. Right: the extent to which options on these spreads overstated the spread's subsequent movement, before and after 2022. The vertical lines show 95% confidence intervals.*
 
-## 1. Motivation
+## 1. The question
 
-US working gas in storage is drawn down through the winter, and March is the last delivery month of the heating season. When end-March storage looks short, the March contract can trade far above April; traders call this spread the widowmaker. Anyone short winter gas faces a costly tail from a cold February or an unexpected supply loss, so they should be willing to pay to hedge it.
+Natural gas is stored through the summer and withdrawn through the winter, so the amount left in storage at the end of March summarises how demanding the winter has been. The links are straightforward. Weather drives demand, demand drives withdrawals from storage, and the expected level of storage should in turn be reflected in futures prices.
 
-If hedgers consistently pay more than the risk is worth, the spread and its options should be overpriced on average. Sellers would then collect small gains most winters and take occasional severe losses.
+Each link in this chain can be measured with public data. The aim of the project was to find how far along the chain a forecast remains useful. A forecast of the weather may well predict storage, but it is a separate question whether a forecast of storage predicts prices. If it does, the chain yields a trading signal. If it does not, the point at which it breaks says something about how the market works.
 
-I did not start from this hypothesis. I set out to test each link of the chain from weather to storage to the futures curve. The premium is what remained once the other links failed out of sample.
+## 2. Method
 
-## 2. Data and testing discipline
+Every test followed the same procedure, designed to prevent the results from being shaped after the fact.
 
-**Data.**
-- Physical data are public: EIA weekly and monthly storage, Open-Meteo temperatures, NOAA GEFS ensemble forecasts and CPC outlooks.
-- Futures and option settlements are CME data obtained through Databento. They are licensed, so this repository contains only code and derived results.
+1. **Each hypothesis was written down before any results were seen**, together with the rule for judging whether it had succeeded. These records, and the exact code used, are committed to this repository with timestamps.
+2. **The models were developed on data from 2010 to 2021.** The years 2022 to 2026 were withheld and used for a single final test. The futures results were also tested once on the earlier decade, 2000 to 2010.
+3. **Uncertainty was measured winter by winter.** Daily observations within one winter are closely related, and treating them as independent would overstate the strength of the evidence.
+4. **Every final result is published, whether or not it supported the hypothesis.**
 
-**Discipline.** Each study followed the same rules:
-1. **Pre-registration.** Hypotheses, statistics and pass/fail thresholds were committed here before results were seen, and frozen code is identified by its hash.
-2. **Development vs holdout.** Models were developed on 2010–2021 and tested once on 2022–2026. The futures results were also tested once on 2000–2010.
-3. **Inference.** Confidence intervals come from a bootstrap that resamples whole winters, because observations within a winter are not independent.
-4. **Reporting.** Every holdout result, including the failures, is published in [`reports/holdout/`](reports/holdout/).
+The weather and storage data are public and come from the US Energy Information Administration and the US weather service. The futures and options prices are exchange data purchased from a data vendor. Because those prices are licensed, the repository contains the code and the results derived from them but not the prices themselves.
 
-## 3. Results
+## 3. Where the chain holds and where it breaks
 
-### 3.1 The futures premium
+The physical links of the chain hold well.
+- A simple regression predicts each week's change in US gas storage from temperatures, weighted by where gas is consumed. Over 253 weeks that the model had not seen, its average error was 13.8 billion cubic feet, compared with 31.3 for the conventional benchmark, the five-year average.
+- When the same model is run forward through the weather of past winters, it produces ranges for end-of-season storage that contain the true outcome about as often as they claim to.
+- Since 18 November 2026 the model has published a forecast every week, before each official storage report.
 
-Take a trader who sells one March–April spread (10,000 MMBtu) on the first trading day of December and holds it to the March option expiry.
-- **Win rate.** The trade made money in 21 of 26 winters.
-- **Size of gains.** The median gain was $1,200 and the mean $1,800.
-- **The losses.** These are what make it a premium rather than an anomaly. In 2003 a late-winter squeeze cost $28,400 per spread, roughly sixteen average winters of gains. The 2014 polar vortex cost $3,600.
-- **Holdout.** The pattern held in 2000–2010, a decade I examined only at the final test ([v4 summary](reports/holdout/SUMMARY_v4.md)).
+The link from storage to prices does not hold in any way that can be exploited.
+- Storage reports that differ from normal explain almost none of the movement in the March–April price spread.
+- The reason is timing. Prices respond to weather forecasts as soon as those forecasts are issued, often a week or more before the storage report confirms their effect. By the time storage is known, the information is already in the price.
+- Consistent with this, none of the trading rules built on storage survived the final test. A rule that bet on the reversal of unexplained price moves worked from 2010 to 2021 but failed in the earlier decade.
+- Option prices did not predict the direction of futures prices either.
 
-### 3.2 The options premium
+What remained after these tests was not a way of forecasting prices but a regularity in how the market prices risk. That regularity is the subject of the next section.
 
-If the spread carries a squeeze premium, options on it should be priced as if the spread will move more than it does.
+## 4. What survives: a premium for protection against a shortage
 
-**Measure.** For each calendar-spread option with open interest, I compared its implied normal volatility with the volatility the spread actually realised over the option's remaining life.
+March is the last month of the heating season. If storage runs short, the price of March gas can rise far above the price of April gas, and anyone committed to delivering gas in March can suffer large losses. Such participants have good reason to pay for protection against this outcome. If they consistently pay more than the protection is worth, those who sell it should earn small profits in most winters and suffer occasional severe losses. The evidence shows exactly this pattern, and it shows it in two separate markets.
 
-**Results.**
+**The futures market.** Selling one March–April futures spread on the first trading day of December and holding it to expiry earned money in 21 of the 26 winters from 2001 to 2026. The typical (median) gain was about $1,200 per contract and the average about $1,800. The losses reveal the nature of the trade. In 2003 a late-winter shortage cost $28,400 per contract, roughly sixteen average winters of gains. The pattern also held from 2000 to 2010, a decade examined only in the final test.
 
-| Sample | Mean log ratio (implied / realised) | Implied vs realised |
-| --- | --- | --- |
-| Development, 2010–2021 | +0.33 | 39% richer |
-| Holdout, 2022–2026 (frozen in advance, run once; includes the 2022 energy crisis) | +0.24 | 27% richer (95% CI 7% to 52%) |
-| Holdout, March–April only | +0.29 | about 34% richer |
+**The options market.** If the spread carries a premium for protection, options on the spread should be priced as though the spread will move more than it actually does. To test this, the movement implied by each option's price was compared with the movement the spread actually showed before the option expired. Between 2010 and 2021, options implied 39% more movement than occurred. For the withheld years 2022 to 2026, the test was fixed in advance and run once. Options implied 27% more movement than occurred, with a 95% confidence interval of 7% to 52%, and the result held through the 2022 energy crisis.
 
-**Can the premium be harvested?** That is not yet established. A short, delta-hedged straddle earned $176 per trade in the holdout, but the interval includes zero and the same trade lost money in development ([v5 summary](reports/holdout/SUMMARY_v5.md)).
+Whether this premium can be collected after trading costs has not been established. A strategy that sold these options was profitable in the final test, but not by a margin large enough to rule out chance, and it lost money in the earlier period.
 
-### 3.3 Forecasting storage
-
-The physical side of the chain is far easier to forecast than prices.
-
-**Weekly change.** A ridge regression on gas-weighted degree days and seasonal terms predicts the weekly storage change.
-- Out of sample, over 253 weeks, its mean absolute error is 13.8 Bcf.
-- The five-year-average benchmark misses by 31.3 Bcf.
-- The improvement is 11 to 24 Bcf (95% CI).
-
-**End of season.** Simulating the model forward through historical weather years gives calibrated ranges: the 80% intervals covered the outcome 85–93% of the time.
-
-**Live.** Since 18 November 2026, the model has published a forecast every Wednesday before the EIA report, timestamped by an automated commit ([live record](reports/live_forecasts.csv)).
-
-## 4. What did not work
-
-The negative results mark the boundaries of the premium:
-- **Storage surprises.** Relative to normal, they explain almost none of the March–April spread's moves (holdout R² of 0.02). The curve has already moved on weather forecasts before the storage report arrives.
-- **Relative-value rules.** None survived its holdout: not curve kinks, not implied versus forecast storage, not a storage-based fair value.
-- **Fading price shocks.** Shocks not explained by forecasts partly reversed in 2010–2021 and continued in 2000–2010.
-- **Options as predictors.** Option prices and Greeks did not predict futures returns.
-- **Outright options.** Volatility on single-month contracts was roughly fair.
-- **End-of-season forecast.** Its central forecast beats the five-year path only within about eight weeks of the season's end.
-
-## 5. A live monitor
+## 5. A monitor of the premium
 
 ![Figure 2](reports/tool/figures/monitor.png)
-*Figure 2. Left: end-March 2027 storage relative to its five-year average, implied by spread options (blue) and by a physical model (orange), on 17 November 2026. Right: each model's probability of a 400 Bcf deficit, averaged over the weekly readings of each winter.*
+*Figure 2. Left: the distribution of end-March 2027 storage relative to its five-year average, as implied by option prices (blue) and by a physical model of storage and weather (orange), on 17 November 2026. Right: each model's probability of a shortfall of 400 billion cubic feet or more, averaged over each winter.*
 
-From November to mid-February the monitor reports two readings each week.
+If the premium is real, its current size is worth knowing. The monitor measures it each week from November to mid-February, in two ways.
 
-**Option richness.**
-- On 17 November 2026, the March–April option implied a spread volatility of $0.47 a year. The spread had actually moved at $0.10 a year over the previous 20 days.
-- At the same point in past winters, implied volatility exceeded what the spread went on to realise in 10 of 13 cases, typically by about two times.
+**First, it compares the movement implied by current option prices with the movement the spread is actually showing.**
+- On 17 November 2026, the options implied movement of about 47 cents a year. Over the previous four weeks, the spread had moved at about 10 cents a year.
+- At the same point in past winters, the options overstated the spread's subsequent movement in 10 of 13 cases, typically by a factor of two.
 
-**Scarcity odds.**
-- The monitor converts the option-implied distribution of the spread into odds for end-March storage, and sets them beside a physical model built from storage, weather forecasts and analog winters.
-- Today the options imply a 12% chance of a deficit of 400 Bcf or more; the physical model says 9%.
-
-**Validation of the scarcity odds.** I tested these odds before using them ([test](reports/tool/GATE.md), [result](reports/tool/GATE_RESULT.md)).
-- They lost to the historical base rate on 2022–2026: no deficit occurred, yet the options priced odds of 15–25% every year.
-- That is consistent with a premium, but five quiet winters cannot separate a premium from a lack of skill.
-- So the monitor describes what the market is pricing, not where storage will end up.
+**Second, it translates option prices into the probability that the market assigns to a storage shortfall, and sets this beside the probability given by the physical model.**
+- On 17 November 2026, the options implied a 12% chance that end-March storage would fall 400 billion cubic feet or more below its five-year average. The physical model gave 9%.
+- This second measure was tested before use, and it failed.
+  - From 2022 to 2026 no such shortfall occurred, yet the options assigned it a probability of 15% to 25% every year. A simple historical average therefore proved more accurate.
+  - The failure is consistent with a premium, since the market once again paid for protection it did not need. Five uneventful winters, however, cannot distinguish a premium from a lack of skill.
+  - The monitor therefore reports what the market is pricing, and makes no claim about where storage will end up.
 
 ## 6. Conclusion
 
-Weather and storage are forecastable, but by the time that information is confirmed, prices already reflect it. What survives out of sample is a premium for bearing squeeze risk, visible in both futures and options: profitable on average and dangerous in the tail.
+The chain from weather to prices holds in its physical links and breaks where prices enter. Storage can be forecast, but prices have already responded to the weather that drives it. What survives is not a means of predicting prices but a regularity in how the market prices risk. Buyers of protection against a late-winter shortage pay more than the protection turns out to be worth, in futures and in options alike, and the sellers of that protection are occasionally exposed to severe losses.
 
-Three questions remain open, and the monitor and live records are set up to answer them:
-- Can the option premium be harvested after costs?
-- Does its size vary predictably with storage and weather?
-- Can a physical fair value time it?
+Three questions remain open:
+- whether the premium can be collected after costs;
+- whether its size changes predictably with storage and weather;
+- whether a physical estimate of fair value can indicate when the premium is largest.
+
+The weekly monitor and the live forecast record are designed to answer these questions as new winters arrive.
 
 <details>
 <summary>Appendix: specifications, data and reproduction</summary>
 
 **Weekly storage model.**
-- **Features:**
-  - gas-weighted heating and cooling degree days, with their anomalies and squares;
+- *Inputs:*
+  - heating and cooling degree days weighted by gas consumption, together with their deviations from normal and their squares;
   - seasonal terms;
   - the five-year average change;
   - recent forecast errors;
-  - a holiday flag.
-- **Fitting:** ridge regression with α = 0.1, chosen by validation error on 2018–2021 from a grid of 0.001 to 100, and refit weekly.
-- **Benchmark model:** gradient boosting (learning rate 0.03, 7 leaves, 300 iterations, minimum leaf 20, L2 1.0, refit every four weeks) scored 14.6 Bcf. The 0.9 Bcf difference is not significant (CI −0.9 to 2.8), so the simpler model is used.
-- The scenario model and the live job use the same specification.
+  - a holiday indicator.
+- *Fitting:* ridge regression with a penalty of 0.1, chosen by validation error on 2018–2021 from a grid of 0.001 to 100, and refit weekly.
+- *Comparison:* a gradient-boosting model (learning rate 0.03, 7 leaves, 300 iterations, minimum leaf size 20, L2 penalty 1.0, refit every four weeks) had an error of 14.6 billion cubic feet. The 0.9 difference from the ridge model is not statistically significant (interval −0.9 to 2.8), so the simpler model is used. The scenario model and the live job use the same specification.
 
 **End-of-season scenarios.**
-- About 20 historical weather years, each re-centred on the latest 10-year normal.
+- About 20 historical weather years, each adjusted to the latest 10-year normal.
 - Out-of-sample errors are resampled in four-week blocks from the same half of the year.
-- The result is an empirical scenario distribution, not a probabilistic weather forecast.
+- The result is a distribution of historical scenarios rather than a probabilistic weather forecast.
 
 **Monitor.** Three components ([integration notes](reports/tool/integration.md)):
-- a risk-neutral density of the spread, from calendar-spread option settlements;
-- a walk-forward map from spread to storage, fitted on winters since 1994;
-- an analog physical model.
+- a probability distribution for the spread, derived from option prices;
+- a map from the spread to end-March storage, fitted on winters since 1994 and updated each year using only past data;
+- a physical model based on storage, weather forecasts and comparable past winters.
+
+The frozen test and its result are in [GATE.md](reports/tool/GATE.md) and [GATE_RESULT.md](reports/tool/GATE_RESULT.md).
 
 | Path | Contents |
 | --- | --- |
 | `src/model1.py`, `src/model2.py`, `src/live.py` | Weekly model, scenarios, live job |
-| `src/collect/` | Data collectors run by GitHub Actions |
-| `src/v4/`, `src/v5/` | Weather-news and options studies |
-| `src/tool/` | Monitor, gate test, figures |
-| `tests/` | No-look-ahead checks |
+| `src/collect/` | Data collection, run by GitHub Actions |
+| `src/v4/`, `src/v5/` | Weather-forecast and options studies |
+| `src/tool/` | Monitor, final test, figures |
+| `tests/` | Checks that no forecast uses future data |
 
 ```
 pip install -r requirements.txt
