@@ -1,82 +1,109 @@
 # From weather to the gas curve
 
-How far up the chain **weather → weekly storage → end-of-season storage → futures spread** can free public data forecast US natural gas, out of sample?
+**Where does weather and storage information show up in US natural gas futures and options, and where doesn't it?**
 
-Everything here uses public data (EIA, Open-Meteo, and later CME settlements via Databento). Every test was written down in [`reports/protocol.md`](reports/protocol.md) before its results were seen. That file also logs every change and every model version's score, including the weaker ones.
+Every test was written down and pushed here *before* its results were seen. The last years of data were held back and tested once. Failures are published alongside successes.
 
-## Winter Squeeze-Risk Monitor (24 Nov 2026)
+![March−April premium and spread-option richness](reports/figures/hero.png)
+
+## Three results
+
+| | Result | Evidence |
+| --- | --- | --- |
+| **1. Futures** | Traders overpay for end-of-winter squeeze insurance. Shorting March−April futures from 1 December to expiry paid in **21 of 26 winters** (2001–26). | Rare, large losses (2003: −$28k per spread). That is the shape of an insurance premium, not a free lunch. [v4 summary](reports/holdout/SUMMARY_v4.md) |
+| **2. Options** | The same premium appears in options. Calendar-spread options on adjacent gas months price **27–39% more spread volatility than is realised**. | 2010–21: +39%. Then on untouched 2022–26 data, tested once: **+27%, 95% CI +7% to +52%**. [v5 summary](reports/holdout/SUMMARY_v5.md) |
+| **3. Physical** | A weekly storage forecast misses by **13.8 Bcf**, against 31.3 Bcf for the 5-year average (−56%). | Out of sample, 253 weeks from 2022. 95% CI on the improvement: 11–24 Bcf. Runs live every Wednesday before EIA's report. |
+
+## Live: Winter Squeeze-Risk Monitor
 
 ![monitor](reports/tool/figures/monitor.png)
 
-Each week, from November to mid-February, the monitor reads the March–April spread-option prices and turns them into the market's odds for end-March storage. It puts those odds next to a physical model built from storage, weather and analog years.
+Every week from November to mid-February, the monitor shows what the options are pricing for the end of winter, next to what the fundamentals say.
 
-**Today (17 Nov 2026), winter 2026-27:**
-- The options imply a **12%** chance that storage ends 400+ Bcf below its 5-year average (map band 7–16%).
-- The physical model says **9%**.
-- The options price a **3%** chance of a 25c+ March–April squeeze at expiry.
-- Both legs put the median end-March near +110 to +130 Bcf vs the 5-year average.
+**Reading for winter 2026-27 (options as of 17–19 Nov 2026):**
+- **Spread-option richness: the premium.**
+  - March−April options imply a spread volatility of **$0.47** per year.
+  - The spread has actually moved at **$0.10** over the last 20 days.
+  - In past winters, mid-November implied volatility exceeded what the spread then realised in **10 of 13** cases, typically by about 2×.
+- **Scarcity odds.**
+  - Options imply a **12%** chance that end-March storage finishes 400+ Bcf below its 5-year average.
+  - The physical model (storage, weather forecasts, past-winter analogs) says **9%**.
+  - Options price a **3%** chance of a 25¢+ March−April squeeze.
 
-**Test result, frozen before running** (`reports/tool/GATE.md`, then `GATE_RESULT.md`):
-- On the untouched 2022–26 storage outcomes, the options-implied odds **lost to climatology**. No winter ended in deficit, yet the options priced 15–25% deficit odds and 6–14% squeeze odds every year.
-- So the monitor is a **market-reading** tool, not a storage forecaster. The tail the options carry matches the squeeze premium found elsewhere in this repo, but this test cannot prove that.
-- Exploratory, not pre-registered: in both samples the physical model's fair spread tracked the realised expiry spread better than the futures forward did (correlation 0.52 vs 0.28 in 2012–21; 0.68 vs −0.23 in 2022–26).
+**How far to trust it:** the scarcity odds were tested before use ([frozen test](reports/tool/GATE.md), [result](reports/tool/GATE_RESULT.md)) and **lost to the historical average on 2022–26**. No deficit winter occurred, yet the options priced 15–25% odds every year. That matches the premium above, but five quiet winters can't prove it. So the monitor reads the market; it does not forecast storage.
 
-## Results so far (updated 19 Nov 2026)
-**Model 1: this week's storage change, from this week's weather.** Out of sample from 2022 (253 weeks):
+## What did not work
 
-| Forecast | Average miss (Bcf) |
-| --- | --- |
-| 5-year average | 31.3 |
-| Ridge regression | **13.8** |
+- **Storage surprises barely move the March−April spread** (holdout R² 0.02). The curve moves on weather forecasts, ahead of the storage reports.
+- **No relative-value trading rule survived its holdout.** This covers curve kinks, implied vs forecast storage, storage-based fair value and premium-shock reversal (it worked in 2010–21 and reversed in 2000–10).
+- **Option prices and Greeks don't forecast the futures.** Outright option volatility is roughly fair.
+- **Harvesting the options premium after costs is not proven.** The short spread-option straddle was +$176 per trade on 2022–26, but its interval includes zero, and it was negative in development.
+- **The storage-centre forecast** beats "normal" only within about 8 weeks of season end. Earlier, weather is unforecastable.
 
-- Ridge's advantage over the 5-year average is 17.5 Bcf per week, with a 95% block-bootstrap interval of 11.0–24.3.
-- Its 80% ranges contained the actual 85% of the time.
-- Gradient boosting scores 14.6 Bcf. The two are **statistically tied**, so the simpler linear model is preferred.
+## How the work is tested
 
-**Model 2: storage at the end of the season, as a probability range.** Model 1 is simulated forward through about 20 past years of weather, each combined with Model 1's own past errors.
-- The 80% ranges are calibrated: they covered the actual 85–93% of the time from 2022.
-- The central forecast beats the 5-year-average path only within about 8 weeks of season end. Further out, weather is unforecastable and "normal" is as good a centre as any.
+1. **Write the test first.** Hypotheses, thresholds and pass/fail rules are committed before any result is seen. The log is in [`reports/protocol.md`](reports/protocol.md), including weaker model versions.
+2. **Hold data back.**
+   - Build on 2010–21.
+   - Test once on 2022–26, and separately on 2000–10.
+   - The frozen code's sha256 hashes are recorded.
+3. **Publish everything.** Every holdout result is in [`reports/holdout/`](reports/holdout/), passes and fails alike.
+4. **Run live.** GitHub Actions record forecasts weekly, before the outcome is known; the commit time is the timestamp.
 
-**Model 3 and Study v2: what the futures curve knows about storage.** Results from 2010–2021, then a single holdout run on 2022–2026 ([summary](reports/holdout/SUMMARY.md), [synthesis](reports/synthesis_v2.md)):
-- **Storage surprises measured against norms barely move the March–April spread** (holdout R² 0.02).
-- **The curve moves ahead of storage reports, mostly on weather** (holdout correlation −0.21 with the report two weeks out; about 70% of it is weather).
-- **The winter curve behaves as one factor.**
-- **No relative-value trading rule survives the holdout:** curve kinks, the gap between implied and forecast storage, and the storage-based fair value all fail.
-- **One narrow pattern recurs:** early-winter scarcity spikes that partly unwind (2018, 2021, 2022, 2026). It is now tracked live as a hypothesis. It carries real tail risk: the 2014 polar-vortex spike kept rising.
+<details>
+<summary><b>Model details</b> (storage forecast, scenario model, specifications)</summary>
 
-## Live record
-Every Wednesday at 12:00 UTC, before EIA's release, a [GitHub Action](.github/workflows/live_forecast.yml) does three things:
-1. It refreshes storage from EIA's bulk file.
-2. It scores last week's forecast against what EIA reported.
-3. It commits this week's forecast to [`reports/live_forecasts.csv`](reports/live_forecasts.csv), and the end-of-season forecast to [`reports/live_end_of_season.csv`](reports/live_end_of_season.csv).
+**Model 1: this week's storage change from this week's weather.**
+- Ridge regression on gas-weighted heating and cooling degree days, their anomalies and squares, seasonality terms, the 5-year average change, recent forecast errors, and a holiday flag.
+- Settings:
+  - ridge alpha = 0.1, chosen by validation MAE on 2018–21 from {0.001 … 100};
+  - refit weekly;
+  - holdout 2022–26 (253 weeks).
+- Results:
+  - 13.8 Bcf mean absolute error, vs 31.3 for the 5-year average;
+  - 80% ranges contained the outcome 85% of the time.
+- Gradient boosting (HistGradientBoosting: learning rate 0.03, 7 leaves, 300 iterations, min leaf 20, L2 1.0; refit every 4 weeks) scores 14.6 Bcf.
+- The two are statistically tied (difference 0.9 Bcf, CI −0.9 to 2.8), so the simpler model is used.
+- Model 2 and the live forecast use the same alpha and features.
 
-The bot's commit time is the timestamp. Column meanings are in [`reports/README.md`](reports/README.md).
+**Model 2: end-of-season storage as a probability range.**
+- Model 1 is simulated forward through about 20 historical weather years, each re-centred on the latest 10-year normal, plus out-of-sample errors resampled in 4-week blocks from the same half of the year.
+- This is an empirical scenario distribution, not a weather-probability forecast: analog years are not weighted by forecast regime.
+- The 80% ranges covered the outcome 85–93% of the time from 2022.
+- Later studies (v4) added archived GEFS ensemble forecasts.
 
-## Repository map
-| Path | What it is |
-| --- | --- |
-| `src/fetch.py` | Downloads storage, prices (EIA bulk file) and weather (Open-Meteo) |
-| `src/model1.py` | Model 1 features, walk-forward test and scoring |
-| `src/bootstrap.py` | Confidence intervals for Model 1 |
-| `src/model2.py` | Model 2 scenario simulator, backtest and live forecast |
-| `src/live.py` | Weekly live forecast and scoring |
-| `src/prices.py` | Contract settlement prices (Databento) for Model 3 |
-| `src/plots.py` | Figures |
-| `tests/` | Checks that no forecast can see data from after its date |
-| `reports/` | Protocol, results and live records ([guide](reports/README.md)) |
-
-## Reproduce
-```
-pip install -r requirements.txt          # add requirements-model3.txt for Model 3
-python -c "from src.fetch import from_bulk; from_bulk('NG.txt')"      # EIA bulk file, no key
-python -c "from src.fetch import fetch_weather, weekly_degree_days; weekly_degree_days(fetch_weather())"
-python -m pytest tests          # no-look-ahead checks
-python -m src.model1            # Model 1 walk-forward (current version)
-python -m src.bootstrap         # Model 1 confidence intervals
-python -m src.model2            # Model 2 backtest
-python -m src.plots             # figures
-```
+**Monitor components** ([integration notes](reports/tool/integration.md)):
+- a risk-neutral density of the March−April spread from spread-option settles;
+- a walk-forward spread → storage map (winters since 1994);
+- a physical analog model;
+- spread-option richness.
 
 ![Model 1 holdout](reports/figures/model1_holdout.png)
-
 ![Model 2 fans](reports/figures/model2_fans.png)
+</details>
+
+<details>
+<summary><b>Data, repository map, reproduce</b></summary>
+
+**Data:**
+- Public: EIA storage and futures, Open-Meteo, NOAA GEFS reforecasts and CPC outlooks.
+- Licensed: CME futures and options settlements via Databento. These are not redistributed; scripts and derived results only.
+
+| Path | What it is |
+| --- | --- |
+| `src/model1.py`, `src/model2.py`, `src/live.py` | Storage forecast, scenario model, weekly live job |
+| `src/collect/` | Data collectors (GEFS, CPC, EIA), run by GitHub Actions |
+| `src/v4/`, `src/v5/` | Weather-news study, options study |
+| `src/tool/` | Squeeze-Risk Monitor: densities, storage map, physical model, gate test |
+| `reports/protocol.md` | Pre-registration and change log |
+| `reports/holdout/` | Every holdout result |
+| `reports/live_*.csv`, `reports/live_2026_27/` | Live records and frozen live protocol |
+| `tests/` | Checks that no forecast sees future data |
+
+```
+pip install -r requirements.txt
+python -m pytest tests          # no-look-ahead checks
+python -m src.model1            # Model 1 walk-forward
+python -m src.model2            # Model 2 backtest
+```
+</details>
