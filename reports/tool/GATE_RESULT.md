@@ -22,7 +22,7 @@ Raw output: `reports/tool/gate_locked_output.json`. There were 76 readings, all 
   - In dev, the two event winters (2014, 2019) were where the options earned their skill. With no events, the only thing being scored is how much tail is priced, and the options price more.
 
 ## How to read it (no re-tuning, per the frozen rule)
-1. **The monitor is not a storage forecaster.** On storage, the physical model was as good or better in both samples. The options-implied deficit odds lost to climatology in a quiet sample. From now on the monitor is presented as a **market-reading tool**: what the options price for end-March, next to what the fundamentals say.
+1. **The monitor is not a storage forecaster.** On storage, the physical model was as good or better in both samples. The options-implied deficit odds lost to climatology in a quiet sample. Rather, the monitor is presented as a **market-reading tool**: what the options price for end-March, next to what the fundamentals say.
 2. **The failure points the same way as the rest of the project.**
    - The options carried tail probability that did not happen: deficit and squeeze odds above both climatology and outcome in 5 of 5 winters.
    - That fits a risk-neutral squeeze premium (Q ≠ P). It is the same direction as:
