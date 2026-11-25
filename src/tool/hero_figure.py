@@ -18,7 +18,7 @@ a.set_xticks(h.Y[::2]); a.set_xticklabels([f"{y%100:02d}" for y in h.Y[::2]])
 a.set_ylabel("$ thousand per spread")
 a.set_title(f"Selling the March−April spread, 1 Dec to expiry: profitable in {int((h.pnl>0).sum())} of {len(h)} winters",
             loc="left", color=INK, fontsize=11)
-a.annotate("2003 squeeze: −$28k", (2003, -28.4), xytext=(2005.2, -24), color=INK2, fontsize=9,
+a.annotate("2003 shortage: −$28k", (2003, -28.4), xytext=(2005.2, -24), color=INK2, fontsize=9,
            arrowprops=dict(arrowstyle="-", color=INK2, lw=0.8))
 a.annotate("2014 polar vortex", (2014, -3.6), xytext=(2014.6, -12), color=INK2, fontsize=9,
            arrowprops=dict(arrowstyle="-", color=INK2, lw=0.8))
@@ -26,7 +26,7 @@ a.set_xlabel("Winter (March contract year, 20xx)")
 for s in ("top", "right"): a.spines[s].set_visible(False)
 
 b = ax[1]
-lab = ["2010–21\n(built here)", "2022–26\n(untouched,\ntested once)"]
+lab = ["2010–21\n(development)", "2022–26\n(withheld,\ntested once)"]
 m = np.array([0.33, 0.24]); lo = np.array([0.25, 0.065]); hi = np.array([0.44, 0.42])
 pct = lambda v: (np.exp(v) - 1) * 100
 b.bar([0, 1], pct(m), width=0.5, color=BLUE, zorder=3)
